@@ -1,0 +1,141 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Alerts - FrikyBot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- GENERAL CSS -->
+    <link href="/Alerts/styles/standard.css" rel="stylesheet">
+    <link href="/styles/standard.css" rel="stylesheet">
+
+    <!-- PAGE CSS-->
+    <style>
+        body {
+            background-color: #ff00ff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #ALERT {
+            width: calc(100% - 100px);
+            height: calc(100% - 100px);
+            padding: 50px;
+            position: relative;
+        }
+    </style>
+
+    <!-- GENERAL JS-->
+    <script src="/Alerts/scripts/standard.js"></script>
+    <script src="/scripts/standard.js"></script>
+
+    <!-- PAGE JS-->
+    <script>
+        const TEST_RESUB_TTS_TEXT = {};
+
+        let selected_topics = window.location.pathname.split('/').slice(4).join(',');
+        if (selected_topics === '') selected_topics = 'alerts';
+
+        const register_info = {
+            origin: "Overlay",
+            topic: "Alerts",
+            misc: selected_topics
+        };
+
+        let CONFIG = {};
+        let EVENT_PIPELINE = [];
+        let socket = {};
+
+        let BOMBS = [];
+
+        function init() {
+            socket = StartWebsocket(register_info);
+
+            socket.addEventListener('message', function (event) {
+                let type = event.data.toString().split(":")[0];
+                if (type === 'register' || type === 'Error') return;
+                let data = JSON.parse(event.data.toString().split(":").slice(1).join(":"));
+                
+                if (type === 'settings') {
+                    CONFIG = data;
+                } else if (type === '') {
+                    console.log("UNKNOWN ALERT");
+                } else if (type !== '') {
+                    //Add to Pipeline
+                    EVENT_PIPELINE.push({ type, data });
+
+                    if (EVENT_PIPELINE.length === 1) List_triggerAlert(type, data);
+                }
+
+                //Echo back (Ping-Pong alternative)
+                socket.send(event.data.toString());
+            });
+        }
+        
+        function List_triggerAlert(type, alert = {}) {
+            let alert_cfg = CONFIG['Alerts'][type];
+            if (!alert_cfg) return List_triggerNext();
+
+            //Find Profile
+            let profile = findProfileFromAlertCfg(type, alert_cfg, alert);
+            if (!profile) return List_triggerNext();
+            if (!CONFIG['Profiles'][profile.name]) return List_triggerNext();
+            
+            //Add Config Settings
+            let cfg = cloneJSON(CONFIG['Profiles'][profile.name]);
+
+            if (!alert.username) alert.username = 'Unknown';
+            if (!alert.months) alert.months = 'NaN';
+            if (!alert.amount) alert.amount = 'NaN';
+            cfg.text = profile.text || '';
+
+            //Handle Giftbombs- WiP
+            if (type === 'giftbomb' && alert.is_test === false) {
+                let bomb = cloneJSON(alert);
+                bomb.remaining = bomb.total;
+                BOMBS.push(bomb);
+            }
+            else if (type === 'giftsub' && alert.is_test === false) {
+                let id = -1;
+                BOMBS.find((elt, idx) => {
+                    if (elt.username === alert.username) {
+                        id = idx;
+                        return true;
+                    }
+                    return false;
+                });
+
+                if (id >= 0) {
+                    BOMBS[id].remaining--;
+                    if (BOMBS[id].remaining === 0) {
+                        BOMBS.splice(id, 1);
+                    }
+                    return List_triggerNext();
+                }
+            }
+            
+            //Create Alert
+            document.getElementById("ALERT").innerHTML = Alert_Overlay_createHTML(cfg, alert, 'MAIN');
+            Alert_Overlay_trigger('MAIN', cfg, List_triggerNext);
+        }
+        function List_triggerNext() {
+            EVENT_PIPELINE = EVENT_PIPELINE.slice(1);
+            if (EVENT_PIPELINE.length === 0) return;
+            
+            let event = EVENT_PIPELINE[0];
+            List_triggerAlert(event.type, event.data);
+        }
+    </script>
+
+    <!-- MISC -->
+    <script src="/misc/SwitchButton/SwitchButton.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400&display=swap" rel="stylesheet">
+</head>
+<body onload="init();">
+    <!-- MAIN GRID -->
+    <div id="ALERT">
+
+    </div>
+</body>
+</html>

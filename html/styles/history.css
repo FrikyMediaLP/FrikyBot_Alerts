@@ -1,0 +1,168 @@
+#content {
+    background-color: #f5f5f5 !important;
+}
+.darkmode #grid #content {
+    background-color: #2e2e2e !important;
+    color: white;
+}
+
+#content > output {
+    margin-top: 10px;
+}
+
+#ALERTS {
+    display: none;
+    padding-bottom: 20px !important;
+}
+
+    #content #UPPER_HEADER {
+        text-align: center;
+        width: 100%;
+        height: 50px;
+        display: grid;
+        grid-template-columns: auto 155px;
+        grid-template-rows: 100%;
+        background-color: white;
+        margin-bottom: 20px;
+    }
+
+.darkmode #UPPER_HEADER {
+    background-color: #363636 !important;
+}
+
+        #content #UPPER_HEADER p {
+            padding: 5px 0px;
+            margin: 0;
+            font-size: 35px;
+            font-weight: bold;
+        }
+
+#SETTINGS_LINK {
+    margin-top: 5px;
+    margin-right: 5px;
+    height: calc(100% - 30px);
+    padding: 10px;
+    background-color: #19a3ff;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+    #SETTINGS_LINK:hover {
+        background-color: #028deb;
+    }
+
+#content #ALERTS > center.cat {
+    font-size: 20px;
+    font-weight: bold;
+    border-bottom: 1px solid dimgray;
+}
+
+#HISTORY {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 100%;
+}
+
+    #HISTORY .HISTORY_EVENT {
+        display: grid;
+        grid-template-columns: 130px 150px auto 50px;
+        grid-template-rows: auto;
+        cursor: default;
+    }
+
+    #HISTORY .HISTORY_EVENT:hover{
+        background-color: rgba(0, 0, 0, 0.15);
+    }
+    #HISTORY .HISTORY_EVENT[seen] {
+        background-color: lightgray;
+    }
+
+    #HISTORY .HISTORY_EVENT > div{
+        padding: 5px 0;
+    }
+
+        #HISTORY .HISTORY_EVENT:not(:first-child) {
+            border-top: 1px solid gray;
+        }
+        #HISTORY .HISTORY_EVENT .HISTORY_EVENT_TIME, #HISTORY .HISTORY_EVENT .HISTORY_EVENT_TYPE {
+            text-align: center;
+        }
+        #HISTORY .HISTORY_EVENT .HISTORY_EVENT_TEXT {
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img {
+            width: 17px;
+            filter: invert(0.5);
+            cursor: pointer;
+        }
+            #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img:hover {
+                filter: invert(0.2);
+            }
+            #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img[red]:hover {
+                filter: invert(58%) sepia(97%) saturate(6029%) hue-rotate(340deg) brightness(124%) contrast(127%);
+            }
+            #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img:not(:first-child) {
+                margin-left: 10px;
+            }
+
+.HISTORY_EVENT_MESSAGE {
+    color: gray;
+    margin-left: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.HISTORY_EVENT_MESSAGE img {
+    height: 19px;
+    transform: translate(0, 3px);
+}
+
+/* CHANNEL EVENTS */
+#EVENTS{
+    margin: 5px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-gap: 5px;
+}
+
+.CHANNEL_EVENT {
+    width: calc(100% - 12px);
+    padding: 5px;
+    border: 1px solid gray;
+    text-align: center;
+}
+.CHANNEL_EVENT > div{
+    padding: 5px 0;
+}
+    .CHANNEL_EVENT .HYPETRAIN_EVENT_HEADER {
+        display: grid;
+        grid-template-columns: auto auto;
+    }
+
+    .CHANNEL_EVENT .HYPETRAIN_EVENT_LEVEL {
+        font-weight: bold;
+    }
+
+    .CHANNEL_EVENT .HYPETRAIN_EVENT_BODY {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(66px, 1fr));
+        text-align: center;
+    }
+
+        .CHANNEL_EVENT .HYPETRAIN_EVENT_BODY .HYPETRAIN_EVENT_CONTRIBUTION {
+            display: grid;
+            grid-template-rows: auto auto;
+            justify-content: center;
+        }
+
+        /* Load More */
+#History_load_more:not([disabled]), #Events_load_more:not([disabled]) {
+    cursor: pointer;
+}
+    #History_load_more:not([disabled]):hover, #Events_load_more:not([disabled]):hover {
+        filter: brightness(0.9);
+    }

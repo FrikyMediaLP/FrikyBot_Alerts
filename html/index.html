@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Alerts History - FrikyBot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- GENERAL CSS -->
+    <link href="/styles/standard.css" rel="stylesheet">
+    <link href="/styles/Grid/Grid_Foundation.css" rel="stylesheet">
+
+    <!-- PAGE CSS-->
+    <link href="/styles/Grid/Grid_Default.css" rel="stylesheet">
+    <link href="/Alerts/styles/history.css" rel="stylesheet">
+    <link href="/Alerts/styles/standard.css" rel="stylesheet">
+
+    <!-- GENERAL JS-->
+    <script src="/scripts/standard.js"></script>
+    <script src="/Alerts/scripts/standard.js"></script>
+    <script src="/Alerts/scripts/history.js"></script>
+
+    <!-- MISC -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400&display=swap" rel="stylesheet">
+
+    <script src="/misc/NavigationV2/NavigationV2.js"></script>
+    <link href="/misc/NavigationV2/NavigationV2.css" rel="stylesheet">
+
+    <script src="/misc/OUTPUT/OUTPUT.js"></script>
+    <link href="/misc/OUTPUT/OUTPUT.css" rel="stylesheet">
+
+    <script src="/misc/BOT_STATUS/BOT_STATUS.js"></script>
+    <link href="/misc/BOT_STATUS/BOT_STATUS.css" rel="stylesheet">
+
+    <script src="/misc/Login/Login.js"></script>
+    <link href="/misc/Login/Login.css" rel="stylesheet">
+
+    <script src="/misc/SwitchButton/SwitchButton.js"></script>
+    <link href="/misc/SwitchButton/SwitchButton.css" rel="stylesheet">
+</head>
+<body onload="Standard_Page_Init(); init();">
+    <!-- MAIN GRID -->
+    <div id="grid">
+        <!-- NAVI HEADER -->
+        <div class="cellM" id="naviHeader">
+            <a href="../../">FRIKY<span>BOT</span></a>
+        </div>
+
+        <!-- CONTENT HEADER -->
+        <div class="cellM" id="contentHeader">
+
+        </div>
+
+        <!-- NAVI -->
+        <div class="cellM" id="navi">
+            <div id="BOT_STATUS_DETAILS_MINI">
+
+            </div>
+            <div id="mainNavi">
+
+            </div>
+            <button id="LightModeButton" onclick="toggleLightMode()">DarkMode</button>
+            <div id="license"> - <a href="https://fontawesome.com/license" target="_blank">Icon license</a> - </div>
+        </div>
+
+        <!-- ACTUAL CONTENT -->
+        <div class="cellM" id="content">
+            <output></output>
+
+            <div id="ALERTS">
+                <div id="UPPER_HEADER">
+                    <p>FrikyBot Alerts</p>
+                    <a href="/Alerts/Settings" id="SETTINGS_LINK">GO TO SETTINGS</a>
+                </div>
+
+                <center class="cat">HISTORY</center>
+                <div id="HISTORY">
+
+                </div>
+                <center><button id="History_load_more" disabled>load more</button></center>
+
+                <center style="margin-top: 20px;" class="cat">Channel Events</center>
+                <div id="EVENTS">
+
+                </div>
+                <center><button id="Events_load_more" disabled>load more</button></center>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
