@@ -87,7 +87,7 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
 
         this.Config.AddSettingTemplates([
             { name: 'Overlay_Token', type: 'string', requiered: true, default_func: () => this.regenerateOverlayToken(false) },
-            { name: 'Custom_File_Dir', type: 'string', default: this.getMainPackageRoot() + this.getName() + "/custom_files/" },
+            { name: 'Custom_File_Dir', type: 'string', default: this.getMainPackageRoot() + this.getName() + "/custom_files" },
             { name: 'Data_Dir', type: 'string', default: this.getMainPackageRoot() + this.getName() + "/data/" }
         ]);
         this.Config.Load();
@@ -437,10 +437,9 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
             let cfg = this.Config.GetConfig();
             
             if (url.startsWith('/custom/')) {
-                let page = path.resolve(cfg['Custom_File_Dir'] + url.substring(8));
-
                 try {
-                    if (fs.existsSync(page)) res.sendFile(page)
+                    let page = this.HTMLFileExists(url.substring(8), cfg['Custom_File_Dir']);
+                    if (page != "") res.sendFile(page);
                     else res.sendStatus(404);
                 } catch (err) {
                     res.sendStatus(404);
