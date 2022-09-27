@@ -10,6 +10,11 @@
     margin-top: 10px;
 }
 
+#content > #INIT_LOADER {
+    margin: 0 auto;
+    width: 25%;
+}
+
 #ALERTS {
     display: none;
     padding-bottom: 20px !important;
@@ -57,13 +62,36 @@
     font-size: 20px;
     font-weight: bold;
     border-bottom: 1px solid dimgray;
+    position: relative;
 }
+    #content #ALERTS > center.cat > button {
+        position: absolute;
+        bottom: 2px;
+        right: 0;
+        cursor: pointer;
+        border: none;
+        padding: 5px 20px;
+        outline: none;
+    }
+        #content #ALERTS > center.cat > button[disabled] {
+            cursor: default;
+        }
+
+        #content #ALERTS > center.cat > button:not([disabled]):hover {
+            background-color: var(--frikybot-light);
+            color: white;
+        }
 
 #HISTORY {
     width: 100%;
     display: grid;
     grid-template-columns: 100%;
 }
+
+    #HISTORY .WAITING_RING {
+        margin: 10px auto;
+        width: 25%;
+    }
 
     #HISTORY .HISTORY_EVENT {
         display: grid;
@@ -72,12 +100,12 @@
         cursor: default;
     }
 
-    #HISTORY .HISTORY_EVENT:hover{
-        background-color: rgba(0, 0, 0, 0.15);
-    }
-    #HISTORY .HISTORY_EVENT[seen] {
-        background-color: lightgray;
-    }
+        #HISTORY .HISTORY_EVENT:not([seen]):hover {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+        #HISTORY .HISTORY_EVENT:not([seen]) {
+            background-color: rgba(25, 163, 255, 0.15);
+        }
 
     #HISTORY .HISTORY_EVENT > div{
         padding: 5px 0;
@@ -93,6 +121,9 @@
             text-overflow: ellipsis;
             white-space: nowrap;
             overflow: hidden;
+        }
+        #HISTORY .HISTORY_EVENT:not([seen]) .HISTORY_EVENT_TEXT {
+            cursor: pointer;
         }
         #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img {
             width: 17px;

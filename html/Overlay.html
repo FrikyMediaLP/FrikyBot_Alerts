@@ -12,10 +12,15 @@
 
     <!-- PAGE CSS-->
     <style>
+        :root {
+            --chroma-key: #ff00ff;
+        }
+
         body {
-            background-color: #ff00ff;
+            background-color: var(--chroma-key);
             overflow: hidden;
             position: relative;
+            font-family: Roboto, sans-serif;
         }
 
         #ALERT {
@@ -24,6 +29,22 @@
             padding: 50px;
             position: relative;
         }
+
+            #INVALID {
+                width: 100vw;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+
+                #INVALID center {
+                    font-family: Roboto, sans-serif;
+                    font-size: 5vw;
+                    font-weight: bold;
+                    color: red;
+                    text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
+                }
     </style>
 
     <!-- GENERAL JS-->
@@ -32,99 +53,342 @@
 
     <!-- PAGE JS-->
     <script>
-        const TEST_RESUB_TTS_TEXT = {};
-
-        let selected_topics = window.location.pathname.split('/').slice(4).join(',');
-        if (selected_topics === '') selected_topics = 'alerts';
-
         const register_info = {
-            origin: "Overlay",
             topic: "Alerts",
-            misc: selected_topics
+            origin: "Overlay",
+            misc: 'token:' + window.location.pathname.split('/').pop()
         };
+        let RECONNECT_TIMEOUT = 1;
+        let AUTO_RECONNECT = true;
 
         let CONFIG = {};
+        let OVERLAY = null;
+        let PROFILES = null;
         let EVENT_PIPELINE = [];
-        let socket = {};
-
         let BOMBS = [];
 
-        function init() {
-            socket = StartWebsocket(register_info);
+        let cur_counter = 0;
 
-            socket.addEventListener('message', function (event) {
-                let type = event.data.toString().split(":")[0];
-                if (type === 'register' || type === 'Error') return;
-                let data = JSON.parse(event.data.toString().split(":").slice(1).join(":"));
+        function init(reconnect = false) {
+            socket = StartWebsocket(register_info, TCPMessageHandler, init, terminated_event);
+            if(!reconnect) GetVoices().then(arr => VOICES = arr).catch(err => console.log(err));
+        }
+        function TCPMessageHandler(event) {
+            for (let response of event.data.toString().split('[<--@-->]')) {
+                let type = response.substring(0, response.indexOf(':'));
+                let data = response.substring(response.indexOf(':') + 1);
                 
-                if (type === 'settings') {
-                    CONFIG = data;
-                } else if (type === '') {
-                    console.log("UNKNOWN ALERT");
-                } else if (type !== '') {
-                    //Add to Pipeline
-                    EVENT_PIPELINE.push({ type, data });
+                try {
+                    data = JSON.parse(data);
+                } catch (err) {
 
-                    if (EVENT_PIPELINE.length === 1) List_triggerAlert(type, data);
                 }
 
-                //Echo back (Ping-Pong alternative)
-                socket.send(event.data.toString());
-            });
+                //Handle Command
+                switch (type) {
+                    case 'settings': {
+                        CONFIG = data;
+                        ECONNECT_TIMEOUT = 1;
+                    }
+                        break;
+                    case 'overlay': {
+                        if (data === 'invalid') {
+                            OVERLAY = null;
+
+                            //Show Invalid
+                            document.getElementsByTagName('body')[0].innerHTML = '<div id="INVALID"><center>!! THIS OVERLAY IS OUTDATED !!</center><center>!! PLEASE UPDATE OVERLAY URL !!</center></div>';
+                            return;
+                        }
+                        if (!document.getElementById('ALERT')) document.getElementsByTagName('body')[0].innerHTML = '<div id="ALERT"></div>';
+
+                        OVERLAY = data;
+                        document.getElementsByTagName('BODY')[0].style.setProperty('--chroma-key', OVERLAY.chroma_key || '#ff00ff');
+
+                        if (OVERLAY && OVERLAY.type === 'latest' && OVERLAY.settings.general.show_init_icon === true) {
+                            List_triggerLatest('init', null);
+                        }
+                    }
+                        break;
+                    case 'profiles': {
+                        PROFILES = data;
+                    }
+                        break;
+                    case '+profiles': {
+                        PROFILES.push(data);
+                    }
+                        break;
+                    case '-profiles': {
+                        let idx = -1;
+                        PROFILES.find((elt, index) => {
+                            if (elt.name === data) {
+                                idx = index;
+                                return true;
+                            }
+                            return false;
+                        });
+                        if (idx >= 0) PROFILES.splice(idx, 1);
+                    }
+                        break;
+                    case '~profiles': {
+                        let idx = -1;
+                        PROFILES.find((elt, index) => {
+                            if (elt.name === data.name) {
+                                idx = index;
+                                return true;
+                            }
+                            return false;
+                        });
+                        if (idx >= 0) PROFILES.splice(idx, 1);
+                        PROFILES.push(data);
+                    }
+                        break;
+                    case 'skip':
+                        {
+                            SKIPPED = true;
+                            WEIRD_TWITCH_TIME_DIALATION = 0;
+                            if (OVERLAY && OVERLAY.type === 'events') document.getElementById("ALERT").innerHTML = "";
+                        }
+                        break;
+                    default: {
+                        //Add to Pipeline
+                        EVENT_PIPELINE.push({ type, data });
+                        if (EVENT_PIPELINE.length === 1) nextEvent();
+                        break;
+                    }
+                }
+            }
         }
-        
+        function preNext() {
+            EVENT_PIPELINE = EVENT_PIPELINE.slice(1);
+            nextEvent();
+        }
+        function nextEvent() {
+            SKIPPED = false;
+            if (EVENT_PIPELINE.length === 0) return;
+
+            let event = EVENT_PIPELINE[0];
+            
+            if (OVERLAY && OVERLAY.type === 'alerts') {
+                List_triggerAlert(event.type, event.data);
+            } else if (OVERLAY && OVERLAY.type === 'events') {
+                List_triggerEvent(event.type, event.data);
+            } else if (OVERLAY && OVERLAY.type === 'latest') {
+                List_triggerLatest(event.type, event.data);
+            } else if (OVERLAY && OVERLAY.type === 'counter') {
+                List_triggerCounter(event.type, event.data);
+            } else if (OVERLAY && OVERLAY.type === 'history') {
+                List_triggerHistory(event.type, event.data);
+            } else {
+                console.log("Unused Event");
+                console.log(event);
+                setTimeout(preNext, 3000);
+            }
+        }
+
+        function terminated_event(event) {
+            let type = event.toString().substring(0, event.toString().indexOf(':'));
+
+            if (type === 'terminated') {
+                setTimeout(() => init(true), Math.exp(RECONNECT_TIMEOUT) * 1000);
+                RECONNECT_TIMEOUT++;
+                
+                //Show Invalid
+                document.getElementsByTagName('body')[0].innerHTML = '<div id="INVALID"><center>!! THIS OVERLAY IS OUTDATED !!</center><center>!! ' + (AUTO_RECONNECT ? 'AUTO-RELOAD ENABLED' :  'PLEASE RELOAD OVERLAY')+ ' !!</center></div>';
+            }
+        }
+
         function List_triggerAlert(type, alert = {}) {
-            let alert_cfg = CONFIG['Alerts'][type];
-            if (!alert_cfg) return List_triggerNext();
+            let alert_cfg = OVERLAY.settings[type];
+            if (!alert_cfg || alert_cfg.enabled !== true) return nextEvent();
 
             //Find Profile
             let profile = findProfileFromAlertCfg(type, alert_cfg, alert);
-            if (!profile) return List_triggerNext();
-            if (!CONFIG['Profiles'][profile.name]) return List_triggerNext();
-            
+            if (!profile) return nextEvent();
+            if (!PROFILES.find(elt => elt.name === profile.name)) return nextEvent();
+
             //Add Config Settings
-            let cfg = cloneJSON(CONFIG['Profiles'][profile.name]);
+            let cfg = cloneJSON(PROFILES.find(elt => elt.name === profile.name));
 
             if (!alert.username) alert.username = 'Unknown';
             if (!alert.months) alert.months = 'NaN';
             if (!alert.amount) alert.amount = 'NaN';
             cfg.text = profile.text || '';
-
-            //Handle Giftbombs- WiP
-            if (type === 'giftbomb' && alert.is_test === false) {
-                let bomb = cloneJSON(alert);
-                bomb.remaining = bomb.total;
-                BOMBS.push(bomb);
-            }
-            else if (type === 'giftsub' && alert.is_test === false) {
-                let id = -1;
-                BOMBS.find((elt, idx) => {
-                    if (elt.username === alert.username) {
-                        id = idx;
-                        return true;
-                    }
-                    return false;
-                });
-
-                if (id >= 0) {
-                    BOMBS[id].remaining--;
-                    if (BOMBS[id].remaining === 0) {
-                        BOMBS.splice(id, 1);
-                    }
-                    return List_triggerNext();
-                }
-            }
             
             //Create Alert
             document.getElementById("ALERT").innerHTML = Alert_Overlay_createHTML(cfg, alert, 'MAIN');
-            Alert_Overlay_trigger('MAIN', cfg, List_triggerNext);
+            Alert_Overlay_trigger('MAIN', cfg, alert, preNext);
         }
-        function List_triggerNext() {
-            EVENT_PIPELINE = EVENT_PIPELINE.slice(1);
-            if (EVENT_PIPELINE.length === 0) return;
-            
-            let event = EVENT_PIPELINE[0];
-            List_triggerAlert(event.type, event.data);
+        function List_triggerEvent(type, event = {}) {
+            let cfg = OVERLAY.settings[type];
+
+            //Channel Point Redemption Skip
+            if (type === 'channel_point_redemption') {
+                if (cfg.display_time === 'added' && event.status !== 'unfullfilled') {
+                    return preNext();
+                } else if (cfg.display_time === 'update' && event.status !== 'fulfilled') {
+                    return preNext();
+                } else if (!cfg.allowed_rewards.find(elt => elt === 'all') && cfg.allowed_rewards.find(elt => elt === event.reward.id) === undefined) {
+                    return preNext();
+                }
+            }
+
+            //Prediction cancled
+            if (type === 'prediction') {
+                if (event.status === 'canceled') {
+                    document.getElementById("ALERT").innerHTML = "";
+                    return preNext();
+                }
+            }
+
+            //Create Event Alert
+            if (document.getElementById("ALERT").innerHTML === "") {
+                //Create Event
+                document.getElementById("ALERT").innerHTML = Events_createHTML(type, OVERLAY.settings[type], event);
+
+                //Display
+                Events_trigger(document.getElementById("ALERT").childNodes[0], type, OVERLAY.settings[type], event)
+                    .then(preNext);
+            } else {
+                let cfg = OVERLAY.settings[type];
+
+                if (['sub', 'resub', 'giftsub', 'giftbomb', 'cheer'].find(elt => elt === type)) {
+                    //Hypetrain Contribution Events
+                    cfg = OVERLAY.settings['hypetrain'];
+                }
+                
+                let elt = document.getElementById("ALERT").childNodes[0];
+
+                //Update Active Event
+                Events_update(elt, type, cfg, event)
+                    .then(x => {
+                        return new Promise((resolve, reject) => {
+                            if (event.ended_at && (event.status === 'completed' || event.status === 'resolved')) {
+                                setTimeout(() => {
+                                    //Audio
+                                    let AUDIO_elt = FindSubElementFromPath(elt, ['AUDIO']);
+                                    if (AUDIO_elt) AUDIO_elt.remove();
+                                    if (cfg.use_hide_sound && cfg.hide_sound) {
+                                        let element = document.createElement('DIV');
+
+                                        let sound = cfg.hide_sound || 0;
+                                        let volume = cfg.hide_volume || "";
+                                        
+                                        let s = '';
+                                        s += '<audio autoplay data-vol="' + (volume / 100) + '" onplay="this.volume=parseFloat(this.dataset.vol);">';
+                                        s += '<source src="/Alerts/custom/' + sound + '" type="audio/' + sound.split('.').pop() + '">';
+                                        s += '</audio>';
+                                        element.innerHTML = s;
+
+                                        elt.appendChild(element.childNodes[0]);
+                                    }
+
+                                    //Move Out
+                                    elt.dataset.end = true;
+                                    elt.dataset.effect = cfg.hide_method || 'move';
+                                    elt.dataset.dir = cfg.hide_direction || 'R';
+
+                                    //Next Event
+                                    setTimeout(() => resolve(false), 4000);
+                                }, (cfg.display_duration || 10) * 1000);
+                            } else if (type !== 'hypetrain' && event.ended_at && event.status !== 'resolved' && event.status !== 'resolved') {
+                                //Move Out
+                                elt.dataset.end = true;
+                                elt.dataset.effect = cfg.hide_method || 'move';
+                                elt.dataset.dir = cfg.hide_direction || 'R';
+
+                                //Next Event
+                                setTimeout(() => resolve(false), 4000);
+                            } else if (type === 'prediction' && (cfg.hide_time === 'stage' || cfg.hide_time === 'locked') && event.locked_at) {
+                                //Ontime
+                                setTimeout(() => {
+                                    //Move Out
+                                    elt.dataset.end = true;
+                                    elt.dataset.effect = cfg.hide_method || 'move';
+                                    elt.dataset.dir = cfg.hide_direction || 'R';
+
+                                    //Next Event
+                                    setTimeout(() => resolve(false), 4000);
+                                }, (cfg.display_duration || 10) * 1000);
+                            } else {
+                                //Await Updates
+                                return resolve(true);
+                            }
+                        });
+                    })
+                    .then(keep => {
+                        if (!keep) {
+                            document.getElementById("ALERT").innerHTML = "";
+                            WEIRD_TWITCH_TIME_DIALATION = 0;
+                        }
+                        return Promise.resolve();
+                    })
+                    .then(preNext);
+            }
+        }
+        function List_triggerLatest(type, event = {}) {
+            //Channel Point Redemption Skip
+            if (type === 'channel_point_redemption') {
+                if (cfg[type].display_time === 'added' && event.status !== 'unfullfilled') {
+                    return preNext();
+                } else if (cfg[type].display_time === 'update' && event.status !== 'fulfilled') {
+                    return preNext();
+                } else if (!cfg[type].allowed_rewards.find(elt => elt === 'all') && cfg[type].allowed_rewards.find(elt => elt === event.reward.id) === undefined) {
+                    return preNext();
+                }
+            }
+
+            //Create Event
+            document.getElementById("ALERT").innerHTML = Latest_createTopic('MASTER_EVENT', type, event, OVERLAY.settings);
+            Latest_adjustGrid(document.getElementById("MASTER_EVENT"));
+            preNext();
+        }
+        function List_triggerCounter(type, event = {}) {
+            //Create Event
+            if (event.value !== undefined) cur_counter = event.value - 1;
+            switch (type) {
+                case 'giftsub':
+                case 'follow':
+                case 'resub':
+                case 'sub': {
+                    cur_counter++;
+                    break;
+                }
+                case 'giftbomb':
+                case 'cheer': {
+                    cur_counter += event.amount;
+                    break;
+                }
+            }
+
+            let topic = Object.getOwnPropertyNames(OVERLAY.settings)[0];
+
+            document.getElementById("ALERT").innerHTML = Counter_createCounter('MASTER_EVENT', topic, cur_counter, OVERLAY.settings[topic]);
+            Counter_adjustGrid(document.getElementById("MASTER_EVENT"));
+
+            preNext();
+        }
+        function List_triggerHistory(type, event = {}) {
+            //Channel Point Redemption Skip
+            if (type === 'channel_point_redemption') {
+                if (cfg[type].display_time === 'added' && event.status !== 'unfullfilled') {
+                    return preNext();
+                } else if (cfg[type].display_time === 'update' && event.status !== 'fulfilled') {
+                    return preNext();
+                } else if (!cfg[type].allowed_rewards.find(elt => elt === 'all') && cfg[type].allowed_rewards.find(elt => elt === event.reward.id) === undefined) {
+                    return preNext();
+                }
+            }
+
+            //Create Event
+            if (document.getElementById("MASTER_EVENT")) {
+                HistoryList_update(document.getElementById("MASTER_EVENT"), type, event, OVERLAY.settings);
+            } else {
+                event.topic = type;
+                document.getElementById("ALERT").innerHTML = HistoryList_createList('MASTER_EVENT', [event], OVERLAY.settings);
+                HistoryList_adjustGrid(document.getElementById("MASTER_EVENT"));
+            }
+
+            preNext();
         }
     </script>
 
@@ -133,9 +397,6 @@
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400&display=swap" rel="stylesheet">
 </head>
 <body onload="init();">
-    <!-- MAIN GRID -->
-    <div id="ALERT">
 
-    </div>
 </body>
 </html>

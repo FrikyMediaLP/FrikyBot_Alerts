@@ -67,118 +67,121 @@
         <div class="cellM" id="content" style="background-color: #f5f5f5;">
             <output></output>
 
+            <div id="INIT_LOADER">
+                <div class="LOADING_RING">
+                    <div class="LOADING_RING_SPINNER"></div>
+                </div>
+            </div>
+
             <div id="ALERTS">
                 <center class="PageHeader">Alerts Settings</center>
+                <div id="ALERTS_TEST_UI">
 
-                <center class="SubPageHeader">Overlay Page</center>
-                <div id="ALERTS_OVERLAY_PAGE">
-                    <input id="ALERTS_OVERLAY_PAGE_LINK" onmousedown="this.type === 'password' ? event.preventDefault() : null" onkeydown="event.preventDefault()" type="password" />
-                    <button onclick="this.parentElement.childNodes[1].type = this.parentElement.childNodes[1].type === 'password' ? 'text' : 'password'">SHOW</button>
-                    <button onclick="copyToClipboard(this.parentElement.childNodes[1].value); OUTPUT_showInfo('Link copied to clipboard!')">COPY</button>
-                    <button onclick="window.open(this.parentElement.childNodes[1].value, '_blank').focus();">OPEN</button>
-                    <button onclick="Alert_Overlay_Page_reset()">RESET</button>
                 </div>
 
-                <center class="PageCategorie">Alert Overlays</center>
+                <output id="OVERLAY_PAGE_OUTPUT"></output>
+                <center class="SubPageHeader">Manage Overlays</center>
+                <div id="OVERLAY_PAGE_WRAPPER">
+                    <div id="OVERLAY_PAGE">
+                        <center>Tokens</center>
+                        <center>Settings</center>
+                        <center id="OVERLAY_PAGE_INFO_HEADER">Info</center>
+                        <div id="OVERLAY_PAGE_NAMES">
+                            <center id="NEW" onclick="Overlay_Page_select(this, true)">+</center>
+                        </div>
+                        <div id="OVERLAY_PAGE_SETTINGS">
+
+                        </div>
+                        <div id="OVERLAY_PAGE_INFO">
+
+                        </div>
+                    </div>
+                </div>
+
+                <output id="PROFILES_OUTPUT"></output>
+                <center class="SubPageHeader">Alert Profiles</center>
                 <div id="ALERT_OVERLAYS">
-                    <div id="ALERTS_TEST_UI">
-
-                    </div>
-
-                    <div id="ALERT_OVERLAYS_SETTINGS_WRAPPER">
-                        <div id="ALERT_OVERLAYS_ALERTS">
-                            <center>Alerts</center>
-
-                            <div class="HeaderSelecThing" id="ALERT_OVERLAYS_ALERTS_SELECT">
-                                <div onclick="expandAlerts(this)">Select Alert</div>
-                                <div onclick="selectAlert(this, event)" id="ALERT_OVERLAYS_ALERTS_POOL">
-                                    <div>Loading</div>
-                                </div>
-                            </div>
-
-                            <div id="ALERT_OVERLAYS_ALERTS_SETTINGS">
-                                <div>
-                                    <div style="padding-top: 2px;">Enabled</div>
-                                    <div><switchbutton id="ALERT_ENABLE_BUTTON" value="true" onclick="Alerts_SetSaveState(true)"></switchbutton></div>
-                                </div>
-
-                                <div id="ALERT_OVERLAYS_ALERTS_SETTINGS_PROFILES">
-
-                                </div>
-
-                                <div id="ALERT_OVERLAYS_ALERTS_SETTINGS_UI">
-                                    <button onclick="addProfileOption()">Add new Option</button>
-                                    <button id="ALERT_SAVE_BUTTON" onclick="Alert_Save()" disabled>Save Changes</button>
-                                </div>
+                    <div id="ALERT_OVERLAYS_PROFILES">
+                        <center>Profiles</center>
+                        <div class="HeaderSelecThing" id="ALERT_OVERLAYS_PROFILES_SELECT">
+                            <div onclick="expandProfiles(this, event)">Select Profile</div>
+                            <div onclick="selectProfile(this, event)" id="ALERT_OVERLAYS_PROFILES_POOL">
+                                <div>Loading</div>
                             </div>
                         </div>
 
-                        <div id="ALERT_OVERLAYS_PROFILES">
-                            <center>Profiles</center>
-                            <div class="HeaderSelecThing" id="ALERT_OVERLAYS_PROFILES_SELECT">
-                                <div onclick="expandProfiles(this, event)">Select Profile</div>
-                                <div onclick="selectProfile(this, event)" id="ALERT_OVERLAYS_PROFILES_POOL">
-                                    <div>Loading</div>
-                                </div>
+                        <div id="ALERT_OVERLAYS_WRAPPER">
+                            <div id="ALERT_OVERLAYS_HEADER" onclick="OverlaySettingSwitchHeader(event)">
+                                <div data-name="l" highlighted><span>LAYOUT</span></div>
+                                <div data-name="t"><span>TEXT</span></div>
+                                <div data-name="m"><span>MESSAGE</span></div>
+                                <div data-name="i"><span>IMAGE</span></div>
+                                <div data-name="s"><span>SOUND</span></div>
+                                <div data-name="e"><span>EXTRAS</span></div>
                             </div>
-
-                            <div id="ALERT_OVERLAYS_WRAPPER">
-                                <div id="ALERT_OVERLAYS_HEADER" onclick="OverlaySettingSwitchHeader(event)">
-                                    <div data-name="l" highlighted><span>LAYOUT</span></div>
-                                    <div data-name="t"><span>TEXT</span></div>
-                                    <div data-name="m"><span>MESSAGE</span></div>
-                                    <div data-name="i"><span>IMAGE</span></div>
-                                    <div data-name="s"><span>SOUND</span></div>
-                                    <div data-name="e"><span>EXTRAS</span></div>
-                                </div>
-                                <div id="ALERT_OVERLAYS_SETTINGS">
-                                    <div id="ALERT_OVERLAYS_SETTING_LAYOUT"></div>
-                                    <div id="ALERT_OVERLAYS_SETTING_TEXT"></div>
-                                    <div id="ALERT_OVERLAYS_SETTING_MESSAGE"></div>
-                                    <div id="ALERT_OVERLAYS_SETTING_IMAGE"></div>
-                                    <div id="ALERT_OVERLAYS_SETTING_SOUND"></div>
-                                    <div id="ALERT_OVERLAYS_SETTING_EXTRAS"></div>
-                                </div>
-                                <div id="ALERT_OVERLAYS_PREVIEW_WRAPPER">
-                                    <div id="ALERT_OVERLAYS_PREVIEW"></div>
-                                </div>
-                                <div id="ALERT_OVERLAYS_TEST">
-                                    <button onclick="OverlaySettings_expandPreview(this);">PREVIEW ALERT SETTINGS</button>
-                                </div>
-                                <div id="ALERT_OVERLAYS_UI">
-                                    <button id="ALERT_OVERLAY_SAVE_BUTTON" onclick="OverlaySettings_SaveProfile();" disabled>Save Profile</button>
-                                    <img class="copy" title="Duplicate Profile" src="/images/icons/copy-regular.svg" onclick="OverlaySettings_DuplicateProfile();" />
-                                    <img class="export" title="Export Profile Settings" src="/images/icons/external-link-alt-solid.svg" onclick="OverlaySettings_ExportProfile();" />
-                                    <img class="trash" title="Remove Profile" src="/images/icons/trash-alt-solid.svg" onclick="OverlaySettings_RemoveProfile();" />
-                                </div>
+                            <div id="ALERT_OVERLAYS_SETTINGS">
+                                <div id="ALERT_OVERLAYS_SETTING_LAYOUT"></div>
+                                <div id="ALERT_OVERLAYS_SETTING_TEXT"></div>
+                                <div id="ALERT_OVERLAYS_SETTING_MESSAGE"></div>
+                                <div id="ALERT_OVERLAYS_SETTING_IMAGE"></div>
+                                <div id="ALERT_OVERLAYS_SETTING_SOUND"></div>
+                                <div id="ALERT_OVERLAYS_SETTING_EXTRAS"></div>
+                            </div>
+                            <div id="ALERT_OVERLAYS_PREVIEW_WRAPPER">
+                                <div id="ALERT_OVERLAYS_PREVIEW"></div>
+                            </div>
+                            <div id="ALERT_OVERLAYS_TEST">
+                                <button onclick="OverlaySettings_expandPreview(this);">PREVIEW ALERT SETTINGS</button>
+                            </div>
+                            <div id="ALERT_OVERLAYS_UI">
+                                <button id="ALERT_OVERLAY_SAVE_BUTTON" onclick="OverlaySettings_SaveProfile();" disabled>Save Profile</button>
+                                <img class="copy" title="Duplicate Profile" src="/images/icons/copy-regular.svg" onclick="OverlaySettings_DuplicateProfile();" />
+                                <img class="export" title="Export Profile Settings" src="/images/icons/external-link-alt-solid.svg" onclick="OverlaySettings_ExportProfile();" />
+                                <img class="trash" title="Remove Profile" src="/images/icons/trash-alt-solid.svg" onclick="OverlaySettings_RemoveProfile();" />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <center class="PageCategorie">Text to Speech</center>
+                <output id="CHAT_OUTPUT_OUTPUT"></output>
+                <center class="SubPageHeader">Chat Output</center>
+                <div id="CHAT_OUTPUT_WRAPPER">
+                    <div id="CHAT_OUTPUT">
+
+                    </div>
+                </div>
+
+                <output id="TTS_OUTPUT"></output>
+                <center class="SubPageHeader">Text to Speech</center>
                 <div id="TTS_SETTINGS">
                     <div>
                         <div>Pitch</div>
-                        <input id="TTS_Pitch_Slider" type="range" min="0.01" value="1" step="0.01" max="2" oninput="updateVoicePitch(this.value)" />
+                        <input id="TTS_Pitch_Slider" type="range" min="0.01" value="1" step="0.01" max="3" oninput="updateVoicePitch(this.value)" />
                         <input id="TTS_Pitch_Input" type="number" min="-1" value="1" step="0.01" max="2" oninput="updateVoicePitch(Math_map(parseFloat(this.value), -1, 1, 0, 2))+ ''" />
                     </div>
 
                     <div>
                         <div>Voice</div>
                         <div id="TTS_VOICE_SELECT">
+
                         </div>
                     </div>
 
                     <div>
                         <div>Text</div>
-                        <input id="TTS_VOICE_TEXT" type="text" value="This is a test Text to Speech Message!" />
+                        <input id="TTS_VOICE_TEXT" type="text" value="This is a Text to Speech Message!" />
                     </div>
 
                     <div>
                         <button onclick="previewVoice()">PLAY</button>
+                        <button onclick="saveTTS(this)">SAVE</button>
                         <input id="TTS_Volume" title="Volume Control" type="range" min="0" value="1" step="0.01" max="1" />
                     </div>
+                </div>
+
+                <center class="SubPageHeader">Alert Variables</center>
+                <div id="ALERT_VARIABLES">
+
                 </div>
             </div>
         </div>

@@ -4,6 +4,8 @@ const register_info = {
     misc: "all"
 };
 let socket = {};
+let RECONNECT_TIMEOUT = 1;
+let AUTO_RECONNECT = true;
 
 let HISTORY = [];
 let HISTORY_NEXT_PAGINATION = "";
@@ -23,48 +25,85 @@ const ALERT_TEXTS = {
     'raid': '{username} just raided with {amount} Viewers.'
 };
 
-function init() {
-    socket = StartWebsocket(register_info);
-
-    socket.addEventListener('message', function (event) {
-        let type = event.data.toString().split(":")[0];
-        if (type === 'register' || type === 'settings' || type === 'Error') return;
-        let data = JSON.parse(event.data.toString().split(":").slice(1).join(":"));
-
-        //Echo back (Ping-Pong alternative)
-        socket.send(event.data.toString());
-
-        if (type === 'history') Add2History(data);
-    });
-    
-    fetchHistory();
-    fetchEvents();
+async function init() {
     OUTPUT_create();
+    setupWebSocket();
+
+    await fetchHistory().catch(err => {
+        OUTPUT_showError(err.message);
+        console.log(err);
+    });
+
+    await fetchEvents().catch(err => {
+        OUTPUT_showError(err.message);
+        console.log(err);
+    });
+
+
+    //Show
+    document.getElementById('ALERTS').style.display = 'block';
+    document.getElementById('INIT_LOADER').remove();
+    OUTPUT_create();
+
+    setInterval(() => showHistory(HISTORY),  60 * 1000);
+}
+function setupWebSocket() {
+    socket = StartWebsocket(register_info, TCPMessageHandler, terminated_event);
+}
+function TCPMessageHandler(event) {
+    ECONNECT_TIMEOUT = 1;
+    let type = event.data.toString().split(":")[0];
+    let data = JSON.parse(event.data.toString().split(":").slice(1).join(":"));
+
+    if (ALERT_TEXTS[type]) Add2History(data);
+}
+function terminated_event(event) {
+    let type = event.toString().substring(0, event.toString().indexOf(':'));
+
+    if (type === 'terminated') {
+        setTimeout(() => init(true), Math.exp(RECONNECT_TIMEOUT) * 1000);
+        RECONNECT_TIMEOUT++;
+    }
 }
 
 //History
 function Add2History(data) {
     HISTORY.unshift(data);
-    showHistory([data], true);
+    showHistory(HISTORY);
 }
-function showHistory(history = [], update = false) {
+function showHistory(history = []) {
+    document.getElementById('HISTORY_SEEN_BTN').disabled = true;
+
     //Sort just in case
     history.sort((a, b) => b.time - a.time);
 
     let s = '';
-    for (let i = 0; i < history.length; i++) s += createEvent(history[i], i);
-    if(update) document.getElementById('HISTORY').innerHTML = s + document.getElementById('HISTORY').innerHTML;
-    else document.getElementById('HISTORY').innerHTML = s;
+    for (let i = 0; i < history.length; i++) {
+        try {
+            s += createEvent(history[i], i);
+        } catch (err) {
+            console.log(history[i]);
+            console.log(err);
+        }
+    }
+    document.getElementById('HISTORY').innerHTML = s;
+
+    if (document.getElementById('HISTORY').innerHTML === "") {
+        document.getElementById('HISTORY').innerHTML = '<center>NO ALERTS</center>';
+    }
 }
 function createEvent(event, i) {
+    if (event.seen === false) document.getElementById('HISTORY_SEEN_BTN').disabled = false;
+
     let s = '';
-    s += '<div  class="HISTORY_EVENT">';
-    s += '<div class="HISTORY_EVENT_TIME">' + RelativeTime(event.time, 'relative') + '</div>';
+    s += '<div  class="HISTORY_EVENT" ' + (event.seen !== false ? 'seen' : '') + '>';
+    s += '<div class="HISTORY_EVENT_TIME">' + RelativeTime(Math.min(Date.now() - 1000, event.time), 'relative') + '</div>';
     s += '<div class="HISTORY_EVENT_TYPE">' + event.topic + '</div>';
-    s += '<div class="HISTORY_EVENT_TEXT">';
+    s += '<div class="HISTORY_EVENT_TEXT" onclick="updateEvent(' + i + ', this)">';
+    
     s += '<div title="' + FillFormattedString(ALERT_TEXTS[event.topic], event) + '">' + FillFormattedString(ALERT_TEXTS[event.topic], event) + '</div>';
     
-    if (event.message && event.message.text) s += '<div class="HISTORY_EVENT_MESSAGE" title="' + event.message.text + '">' + ReplaceEmotes(event.message.text, event.message.emotes, event.message.ffz_emotes, event.message.bttv_emotes, event.message.cheer_emotes) + '</div>';
+    if (event.message && event.message.text) s += '<div class="HISTORY_EVENT_MESSAGE" title="' + event.message.text + '">' + ReplaceEmotes(event.message.text, event.message.ttv_emotes, event.message.ffz_emotes, event.message.bttv_emotes, event.message.cheer_emotes) + '</div>';
     s += '</div>';
     s += '<div class="HISTORY_EVENT_UI">';
     s += '<img src="/images/icons/refresh.svg" title="Re-Trigger Alert" onclick="retriggertEvent(' + i + ', event)" />';
@@ -74,22 +113,27 @@ function createEvent(event, i) {
     return s;
 }
 
-function fetchHistory(pagination) {
+async function fetchHistory(pagination = GetPaginationString(30, 0, { timesorted: true })) {
     document.getElementById('History_load_more').disabled = true;
-    fetch('/api/alerts/history' + (pagination ? '?pagination=' + pagination : ''), getAuthHeader())
+    return fetch('/api/alerts/history' + (pagination ? '?pagination=' + pagination : ''), getAuthHeader())
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
             HISTORY = json.data;
-            HISTORY_NEXT_PAGINATION = json.pagination;
             showHistory(HISTORY);
 
-            let pages = GetPaginationValues(HISTORY_NEXT_PAGINATION);
-            if (!pages.length || pages.length == 0 || pages[2].pagecount !== pages[1]) document.getElementById('History_load_more').disabled = false;
+            document.getElementById('History_load_more').disabled = false;
+
+            let old_pages = GetPaginationValues(pagination);
+            let new_pages = GetPaginationValues(json.pagination);
+            
+            if (new_pages[2].pagecount === 0 || new_pages[2].pagecount === Math.max(0, old_pages[1] + 1)) document.getElementById('History_load_more').setAttribute('hidden', 'true');
+            else document.getElementById('History_load_more').removeAttribute('hidden');
+
+            HISTORY_NEXT_PAGINATION = json.pagination;
         })
         .catch(err => {
             document.getElementById('History_load_more').disabled = false;
-            OUTPUT_showError(err.message);
-            console.log(err);
+            return Promise.reject(err);
         });
 }
 function retriggertEvent(i, e) {
@@ -98,6 +142,9 @@ function retriggertEvent(i, e) {
 
     let event = HISTORY[i];
     if (!event) return;
+    OUTPUT_hideError();
+
+    if (event.seen === false) event.update_history = true;
 
     const opt = getAuthHeader();
     opt.method = 'POST';
@@ -108,6 +155,8 @@ function retriggertEvent(i, e) {
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
             OUTPUT_showInfo("Alert Trigger Sent!");
+            HISTORY[i].seen = true;
+            showHistory(HISTORY);
         })
         .catch(err => {
             OUTPUT_showError(err.message);
@@ -116,6 +165,7 @@ function retriggertEvent(i, e) {
 }
 async function removeEvent(i, elt) {
     if (i === undefined) return;
+    OUTPUT_hideError();
 
     let event = HISTORY[i];
     if (!event) return;
@@ -131,37 +181,67 @@ async function removeEvent(i, elt) {
 
     if (answer !== 'YES') return Promise.resolve();
 
-    document.getElementById('HISTORY').innerHTML = MISC_LOADING_RING_CREATE();
+    document.getElementById('HISTORY').innerHTML = '<div class="WAITING_RING">' + MISC_LOADING_RING_CREATE() + '</div>';
 
     const opt = getAuthHeader();
     opt.method = 'DELETE';
     opt.headers['Content-Type'] = 'application/json';
-    opt.body = JSON.stringify({ id: event['_id'] });
+    opt.body = JSON.stringify({ event });
 
     fetch('/api/alerts/history', opt)
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
             OUTPUT_showInfo("Alert Removed!");
-            fetchHistory();
+            HISTORY.splice(i, 1);
+            showHistory(HISTORY);
         })
         .catch(err => {
             OUTPUT_showError(err.message);
             console.log(err);
+        });
+}
+async function updateEvent(i, elt) {
+    if (i === undefined) return;
+
+    let event = HISTORY[i];
+    if (!event) return;
+    OUTPUT_hideError();
+
+    const opt = getAuthHeader();
+    opt.method = 'PUT';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ event });
+
+    fetch('/api/alerts/history', opt)
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            HISTORY[i].seen = true;
             showHistory(HISTORY);
+        })
+        .catch(err => {
+            OUTPUT_showError(err.message);
+            console.log(err);
         });
 }
 function loadMoreHistory() {
     document.getElementById('History_load_more').disabled = true;
+    OUTPUT_hideError();
 
     fetch('/api/alerts/history?pagination=' + HISTORY_NEXT_PAGINATION, getAuthHeader())
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
-            HISTORY.concat(json.data);
-            HISTORY_NEXT_PAGINATION = json.pagination;
+            HISTORY = HISTORY.concat(json.data);
             showHistory(HISTORY);
 
-            let pages = GetPaginationValues(HISTORY_NEXT_PAGINATION);
-            if (!pages.length || pages.length == 0 || pages[2].pagecount !== pages[1]) document.getElementById('History_load_more').disabled = false;
+            document.getElementById('History_load_more').disabled = false;
+
+            let old_pages = GetPaginationValues(HISTORY_NEXT_PAGINATION || json.pagination);
+            let new_pages = GetPaginationValues(json.pagination);
+            
+            if (new_pages[2].pagecount === 0 || new_pages[2].pagecount === Math.max(0, old_pages[1] + 1)) document.getElementById('History_load_more').setAttribute('hidden', 'true');
+            else document.getElementById('History_load_more').removeAttribute('hidden');
+            
+            HISTORY_NEXT_PAGINATION = json.pagination;
         })
         .catch(err => {
             OUTPUT_showError(err.message);
@@ -170,24 +250,48 @@ function loadMoreHistory() {
         });
 }
 
-//Events
-function fetchEvents(pagination) {
-    fetch('/api/alerts/events' + (pagination ? '?pagination=' + pagination : ''), getAuthHeader())
+async function MassTriggerUnseen(elt) {
+    OUTPUT_hideError();
+
+    const opt = getAuthHeader();
+    opt.method = 'PUT';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ event });
+
+    document.getElementById('HISTORY').innerHTML = '<div class="WAITING_RING">' + MISC_LOADING_RING_CREATE() + '</div>';
+    elt.disabled = true;
+
+    fetch('/api/alerts/trigger/unseen?mode=all', opt)
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
-            EVENTS = json.data;
-            EVENTS_NEXT_PAGINATION = json.pagination;
-            showEvents(EVENTS);
+            for (let event of HISTORY) {
+                event.seen = true;
+            }
 
-            //Show
-            document.getElementById('ALERTS').style.display = 'block';
-
-            let pages = GetPaginationValues(EVENTS_NEXT_PAGINATION);
-            if (!pages.length || pages.length == 0 || pages[2].pagecount !== pages[1]) document.getElementById('Events_load_more').disabled = false;
+            showHistory(HISTORY);
         })
         .catch(err => {
             OUTPUT_showError(err.message);
             console.log(err);
+            elt.disabled = false;
+        });
+}
+
+//Events
+async function fetchEvents(pagination = GetPaginationString(30, 0, { timesorted: true })) {
+    return fetch('/api/alerts/events' + (pagination ? '?pagination=' + pagination : ''), getAuthHeader())
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            EVENTS = json.data;
+            showEvents(EVENTS);
+
+            let old_pages = GetPaginationValues(pagination);
+            let new_pages = GetPaginationValues(json.pagination);
+            
+            if (new_pages[2].pagecount === 0 || new_pages[2].pagecount === Math.max(0, old_pages[1] + 1)) document.getElementById('Events_load_more').setAttribute('hidden', 'true');
+            else document.getElementById('Events_load_more').removeAttribute('hidden');
+
+            EVENTS_NEXT_PAGINATION = json.pagination;
         });
 }
 function showEvents(events = [], update = false) {
@@ -198,10 +302,15 @@ function showEvents(events = [], update = false) {
     for (let i = 0; i < events.length; i++) s += createChannelEvent(events[i], i);
     if (update) document.getElementById('EVENTS').innerHTML = s + document.getElementById('EVENTS').innerHTML;
     else document.getElementById('EVENTS').innerHTML = s;
+
+    if (document.getElementById('EVENTS').innerHTML === "") {
+        document.getElementById('EVENTS').innerHTML = '<center>NO EVENTS</center>';
+    }
 }
 function createChannelEvent(event, i) {
     if (event.type === 'hypetrain') return createHypeTrain(event.event);
-    if (event.type === 'goal') return createGoal(event.event);
+    else if (event.type === 'goal') return createGoal(event.event);
+    else return "";
 }
 function createHypeTrain(event) {
     let s = '';
@@ -239,11 +348,15 @@ function loadMoreEvents() {
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
             EVENTS.concat(json.data);
-            EVENTS_NEXT_PAGINATION = json.pagination;
             showEvents(EVENTS);
+            
+            let old_pages = GetPaginationValues(EVENTS_NEXT_PAGINATION || json.pagination);
+            let new_pages = GetPaginationValues(json.pagination);
 
-            let pages = GetPaginationValues(EVENTS_NEXT_PAGINATION);
-            if (!pages.length || pages.length == 0 || pages[2].pagecount !== pages[1]) document.getElementById('Events_load_more').disabled = false;
+            if (new_pages[2].pagecount === 0 || new_pages[2].pagecount === old_pages[1] + 1) document.getElementById('Events_load_more').setAttribute('hidden', 'true');
+            else document.getElementById('Events_load_more').removeAttribute('hidden');
+
+            EVENTS_NEXT_PAGINATION = json.pagination;
         })
         .catch(err => {
             OUTPUT_showError(err.message);

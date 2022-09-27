@@ -67,23 +67,30 @@
         <div class="cellM" id="content">
             <output></output>
 
+            <div id="INIT_LOADER">
+                <div class="LOADING_RING">
+                    <div class="LOADING_RING_SPINNER"></div>
+                </div>
+            </div>
+
             <div id="ALERTS">
                 <div id="UPPER_HEADER">
                     <p>FrikyBot Alerts</p>
                     <a href="/Alerts/Settings" id="SETTINGS_LINK">GO TO SETTINGS</a>
                 </div>
 
-                <center class="cat">HISTORY</center>
+                <center class="cat">HISTORY <button id="HISTORY_SEEN_BTN" onclick="MassTriggerUnseen(this);" disabled>TRIGGER UNSEEN</button></center>
                 <div id="HISTORY">
 
                 </div>
-                <center><button id="History_load_more" disabled>load more</button></center>
+                <center><button id="History_load_more" onclick="loadMoreHistory()" hidden>load more</button></center>
 
                 <center style="margin-top: 20px;" class="cat">Channel Events</center>
                 <div id="EVENTS">
 
                 </div>
-                <center><button id="Events_load_more" disabled>load more</button></center>
+                <center><button id="Events_load_more" onclick="loadMoreEvents()" hidden>load more</button></center>
+
             </div>
         </div>
     </div>
