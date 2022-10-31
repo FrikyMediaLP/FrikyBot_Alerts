@@ -221,6 +221,14 @@
     border: none;
 }
 
+#ALERTS_TEST_UI .DROPDOWN_BUTTON {
+    --header-font-size: 13px;
+    --header-font-size: 12px;
+}
+    #ALERTS_TEST_UI .DROPDOWN_BUTTON .DROPDOWN_BUTTON_HEADERS {
+        grid-template-columns: auto 22px;
+    }
+
 #ALERTS_TEST_UI button {
     padding: 5px;
     color: white;
@@ -234,44 +242,20 @@
     text-overflow: ellipsis;
 }
 
-        #ALERTS_TEST_UI button[disabled] {
-            filter: grayscale(1);
-            cursor: default;
-            /* DISABLE SELECT */
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
-
-        #ALERTS_TEST_UI button:not([disabled]):hover {
-            padding: 5px;
-            background-color: var(--hovers);
-        }
-
         #ALERTS_TEST_UI button[custom] {
             background-color: var(--headers);
         }
 
-            #ALERTS_TEST_UI button[custom]:not([disabled]):hover {
+            #ALERTS_TEST_UI button[custom]:hover {
                 background-color: var(--hovers);
             }
 
-        #ALERTS_TEST_UI button[skip] {
-            background-color: lightcoral;
-        }
-
-            #ALERTS_TEST_UI button[skip]:not([disabled]):hover {
-                background-color: #a83232;
-            }
-
-.darkmode #ALERTS_TEST_UI button[skip] {
-    background-color: #a83232;
+#ALERTS_TEST_UI .DROPDOWN_BUTTON.ALERTS_TEST_UI_RED .DROPDOWN_BUTTON_HEADERS > center {
+    background-color: lightcoral;
 }
 
-    .darkmode #ALERTS_TEST_UI button[skip]:not([disabled]):hover {
-        background-color: lightcoral;
+    #ALERTS_TEST_UI .DROPDOWN_BUTTON.ALERTS_TEST_UI_RED .DROPDOWN_BUTTON_HEADERS > center:hover {
+        background-color: #a83232;
     }
 
 /* Import Dialog */
@@ -306,6 +290,13 @@
         #CUSTOM_TEST_DIALOG > select option, #CUSTOM_TEST_DIALOG > select optgroup {
             color: var(--transparents-color);
             background-color: var(--transparents);
+        }
+
+    #CUSTOM_TEST_DIALOG .DROPDOWN_BUTTON {
+        font-family: Roboto, sans-serif;
+    }
+        #CUSTOM_TEST_DIALOG .DROPDOWN_BUTTON .DROPDOWN_BUTTON_HEADERS {
+            grid-template-columns: auto 30px;
         }
 
 /* Alerts Overlay Page */

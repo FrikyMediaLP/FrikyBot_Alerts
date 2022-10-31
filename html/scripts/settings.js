@@ -73,23 +73,49 @@ function init() {
             if (hint !== '') OUTPUT_showWarning('Some Endpoints / Eventsubs are unavailable! </br>' + hint);
 
             //Create Buttons to test trigger Alerts / Events
+            let dropdown_options = [{ name: '', title: 'All Overlays' }];
+
+            for (let overlay of OVERLAYS) {
+                dropdown_options.push({ name: overlay.token, title: overlay.name });
+            }
+
             let s = '';
             s += '<div>';
-            for (let alert of ALERTS)
-                s += '<button onclick="Test_Alert(' + "'" + alert + "'" + ')">Test ' + alert.charAt(0).toUpperCase() + alert.substring(1) + '</button>';
-            s += '</div>';
 
-            s += '<div>';
-            for (let event of EVENTS) {
-                s += '<button onclick="Test_Event(' + "'" + event + "'" + ')">Test ' + (event === 'channel_point_redemption' ? 'Channel Point Redem.' : event.charAt(0).toUpperCase() + event.substring(1)) + '</button>';
-
-                if (event !== 'channel_point_redemption') s += '<button onclick="Test_Event(' + "'end´-" + event + "'" + ')">End ' + event.charAt(0).toUpperCase() + event.substring(1) + '</button>';
+            for (let alert of ALERTS) {
+                s += MISC_createDropdownButton('Test ' + alert.charAt(0).toUpperCase() + alert.substring(1), dropdown_options, 0, 'Test_Alert(' + "'" + alert + "'" + ');', '', 'DROPDOWN_BUTTON_ALERT_' + alert);
             }
             s += '</div>';
 
             s += '<div>';
+            for (let event of EVENTS) {
+                s += MISC_createDropdownButton('Test ' + (event === 'channel_point_redemption' ? 'Channel Point Redem.' : event.charAt(0).toUpperCase() + event.substring(1)), dropdown_options, 0, 'Test_Event(' + "'" + event + "'" + ');');
+
+                if (event !== 'channel_point_redemption') s += MISC_createDropdownButton('End ' + event.charAt(0).toUpperCase() + event.substring(1), dropdown_options, 0, 'Test_Event(' + "'end´-" + event + "'" + ');', '', 'DROPDOWN_BUTTON_EVENT_' + event);
+            }
+            s += '</div>';
+
+            s += '<div>';
+
             s += '<button onclick="CustomTestOpenImportDialog(event)" custom>Custom</button>';
-            s += '<button onclick="SkipAlert()" skip>Skip Current Alert</button>';
+
+            //skip - POST /skip - mode: skip
+            s += MISC_createDropdownButton('Skip Current Alert', dropdown_options, 0, "SkipAlert('skip');", undefined, 'ALERTS_TEST_SKIP', 'ALERTS_TEST_UI_RED');
+            //clear - POST /skip - mode: clear
+            s += MISC_createDropdownButton('Skip All Alerts', dropdown_options, 0, "SkipAlert('clear');", undefined, 'ALERTS_TEST_CLEAR', 'ALERTS_TEST_UI_RED');
+            //pause - POST /pause
+            s += MISC_createDropdownButton('Pause Alerts', dropdown_options, 0, 'PauseAlerts(false);', undefined, 'ALERTS_TEST_PAUSE', 'ALERTS_TEST_UI_RED');
+            //unpause - DELETE /pause
+            s += MISC_createDropdownButton('UnPause Alerts', dropdown_options, 0, 'PauseAlerts(true);', undefined, 'ALERTS_TEST_UNPAUSE', 'ALERTS_TEST_UI_RED');
+
+
+            dropdown_options = [];
+
+            for (let overlay of OVERLAYS) {
+                if(overlay.type === 'history') dropdown_options.push({ name: overlay.token, title: overlay.name });
+            }
+            //remove history element - DELETE /historylist
+            s += MISC_createDropdownButton('History List Remove Last', dropdown_options, 0, 'HistoryListRemove();', undefined, 'ALERTS_TEST_HISTORY_REMOVE', 'ALERTS_TEST_UI_RED');
             s += '</div>';
 
             document.getElementById('ALERTS_TEST_UI').innerHTML = s;
@@ -3047,25 +3073,26 @@ function HistoryListFileRemoveDialog(selected) {
 }
 
 //Test Alerts
-function Test_Alert(type, data) {
-    if (!data) {
+function Test_Alert(type) {
+    let overlay = MISC_getDropdownButtonValue(document.getElementById('DROPDOWN_BUTTON_ALERT_' + type));
+    if (overlay === '') overlay = undefined;
 
-        let tier = 'Unknown';
-        switch (Math.floor(Math.random() * 4)) {
-            case 0: tier = 'Tier 1'; break;
-            case 1: tier = 'Tier 2'; break;
-            case 2: tier = 'Tier 3'; break;
-            case 3: tier = 'Twitch Prime'; break;
-        }
-
-        data = {
-            username: LOGIN_getUsername() || 'Text User',
-            amount: Math.floor(Math.random() * 100) + 1,
-            months: Math.floor(Math.random() * 100) + 1,
-            tier,
-            target: 'Target'
-        };
+    let tier = 'Unknown';
+    switch (Math.floor(Math.random() * 4)) {
+        case 0: tier = 'Tier 1'; break;
+        case 1: tier = 'Tier 2'; break;
+        case 2: tier = 'Tier 3'; break;
+        case 3: tier = 'Twitch Prime'; break;
     }
+
+    let data = {
+        username: LOGIN_getUsername() || 'Text User',
+        amount: Math.floor(Math.random() * 100) + 1,
+        months: Math.floor(Math.random() * 100) + 1,
+        tier,
+        target: 'Target',
+        overlay
+    };
 
     let opts = getAuthHeader();
     opts.method = 'POST';
@@ -3102,32 +3129,57 @@ function CustomTriggerSetup(type = 'join', update = true) {
     s += "<center>Custom Event Trigger</center>";
 
     s += '<select data-name="topic" onchange="CustomTriggerSetup(this.value)">';
+    s += '<optgroup label="Alerts">';
     for (let alert of ALERTS) s += '<option ' + (alert === type ? 'selected' : '') + '>' + alert + '</option>';
     if (ALERTS.length === 0) s += '<option disabled>NO ALERTS AVAILABLE</option>';
+    s += '</optgroup>';
+    s += '<optgroup label="Alerts">';
+    s += '<option value="_counter" ' + (type === '_counter' ? 'selected' : '') + '>Set Counter</option>';
+    s += '</optgroup>';
     s += '</select>';
 
-    //Alert Settings
-    for (let variable of ALERT_VARIABLES[type] || []) {
-        if (variable.name === 'tier') {
-            s += '<select data-name="tier">';
-            for (let tier of ['Tier 1', 'Tier 2', 'Tier 3', 'Twitch Prime']) s += '<option>' + tier + '</option>';
-            s += '</select>';
-            continue;
+    let dropdown_options = [{ name: '', title: 'All Overlays' }];
+    
+    if (type == '_counter') {
+        s += '<select data-name="mode">';
+        s += '<option title="Set Counter Value">=</option>';
+        s += '<option title="Increment Counter">+</option>';
+        s += '<option title="Decrement Counter">-</option>';
+        s += '</select>';
+        s += '<input data-name="amount" type="number" placeholder="Enter Amount here" min="0" />';
+
+        dropdown_options = [];
+        for (let overlay of OVERLAYS) {
+            if (overlay.type === 'counter') dropdown_options.push({ name: overlay.token, title: overlay.name });
+        }
+    } else {
+        for (let overlay of OVERLAYS) {
+            dropdown_options.push({ name: overlay.token, title: overlay.name });
         }
 
-        switch (variable.type) {
-            case 'string':
-                s += '<input data-name="' + variable.name + '"  type="text" placeholder="' + variable.name + '" ' + (variable.desc ? 'title="' + variable.desc + '"' : '') + '/>';
-                break;
-            case 'number':
-                s += '<input data-name="' + variable.name + '"  type="number" placeholder="' + variable.name + '" ' + (variable.desc ? 'title="' + variable.desc + '"' : '') + '/>';
-                break;
+        //Alert Settings
+        for (let variable of ALERT_VARIABLES[type] || []) {
+            if (variable.name === 'tier') {
+                s += '<select data-name="tier">';
+                for (let tier of ['Tier 1', 'Tier 2', 'Tier 3', 'Twitch Prime']) s += '<option>' + tier + '</option>';
+                s += '</select>';
+                continue;
+            }
+
+            switch (variable.type) {
+                case 'string':
+                    s += '<input data-name="' + variable.name + '"  type="text" placeholder="' + variable.name + '" ' + (variable.desc ? 'title="' + variable.desc + '"' : '') + '/>';
+                    break;
+                case 'number':
+                    s += '<input data-name="' + variable.name + '"  type="number" placeholder="' + variable.name + '" ' + (variable.desc ? 'title="' + variable.desc + '"' : '') + '/>';
+                    break;
+            }
         }
+
+        s += '<div data-name="history" style="display: grid; grid-template-columns: auto 25px;"><input type="datetime-local" value="' + GetLocalISODate() + '" disabled /><input type="checkbox" title="Save to History" onchange="this.parentElement.childNodes[0].disabled = !this.parentElement.childNodes[0].disabled" /></div>';
     }
-
-    s += '<div data-name="history" style="display: grid; grid-template-columns: auto 25px;"><input type="datetime-local" value="' + GetLocalISODate() + '" disabled /><input type="checkbox" title="Save to History" onchange="this.parentElement.childNodes[0].disabled = !this.parentElement.childNodes[0].disabled" /></div>';
-
-    s += '<button onclick="CustomTriggerSend()">TRIGGER</button>';
+    
+    s += MISC_createDropdownButton('TRIGGER', dropdown_options, 0, 'CustomTriggerSend();', undefined, 'CUSTOM_TRIGGER_DROPDOWN_BTN');
 
     if (update) {
         document.getElementById('CUSTOM_TEST_DIALOG').innerHTML = s;
@@ -3140,6 +3192,8 @@ function CustomTestremoveImportDialogHTML() {
 }
 function CustomTriggerSend() {
     const event = {};
+    let overlay = MISC_getDropdownButtonValue(document.getElementById('CUSTOM_TRIGGER_DROPDOWN_BTN'));
+    if (overlay !== "") event.overlay = overlay;
 
     for (let elt of document.getElementById('CUSTOM_TEST_DIALOG').childNodes) {
         if (elt.dataset.name === 'history') {
@@ -3158,32 +3212,91 @@ function CustomTriggerSend() {
     if (DEV_CUSTOM_TRIGGER_CHAT_OUTPUT === true) {
         event.use_chat_output = true;
     }
-
-    const opt = getAuthHeader();
-    opt.method = 'POST';
-    opt.headers['Content-Type'] = 'application/json';
-    opt.body = JSON.stringify(event);
-
-    fetch('/api/alerts/trigger/' + event.topic, opt)
-        .then(STANDARD_FETCH_RESPONSE_CHECKER)
-        .then(json => {
-            OUTPUT_showInfo("Custom Trigger Sent!", document.getElementById('TEST_DIALOG_OUTPUT'));
-        })
-        .catch(err => {
-            OUTPUT_showError(err.message);
-            console.log(err, document.getElementById('TEST_DIALOG_OUTPUT'));
-        });
-}
-function SkipAlert(token, mode = 'skip') {
-    const opt = getAuthHeader();
-    opt.method = 'POST';
-    opt.headers['Content-Type'] = 'application/json';
-    opt.body = JSON.stringify({ token, mode });
     
+    const opt = getAuthHeader();
+    opt.headers['Content-Type'] = 'application/json';
+
+    if (event.topic === '_counter') {
+        opt.method = 'PUT';
+        opt.body = JSON.stringify({ overlay, mode: event.mode, amount: event.amount });
+        
+        fetch('/api/alerts/counter', opt)
+            .then(STANDARD_FETCH_RESPONSE_CHECKER)
+            .then(json => {
+                OUTPUT_showInfo("Custom Trigger Sent!", document.getElementById('TEST_DIALOG_OUTPUT'));
+            })
+            .catch(err => {
+                OUTPUT_showError(err.message);
+                console.log(err, document.getElementById('TEST_DIALOG_OUTPUT'));
+            });
+    } else {
+        opt.method = 'POST';
+        opt.body = JSON.stringify(event);
+
+        fetch('/api/alerts/trigger/' + event.topic, opt)
+            .then(STANDARD_FETCH_RESPONSE_CHECKER)
+            .then(json => {
+                OUTPUT_showInfo("Custom Trigger Sent!", document.getElementById('TEST_DIALOG_OUTPUT'));
+            })
+            .catch(err => {
+                OUTPUT_showError(err.message);
+                console.log(err, document.getElementById('TEST_DIALOG_OUTPUT'));
+            });
+    }
+}
+
+function SkipAlert(mode = 'skip') {
+    let overlay = MISC_getDropdownButtonValue(document.getElementById(mode === 'skip' ? 'ALERTS_TEST_SKIP' : 'ALERTS_TEST_CLEAR'));
+    if (overlay === "") overlay = undefined;
+    
+    const opt = getAuthHeader();
+    opt.method = 'POST';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ overlay, mode });
+
     fetch('/api/alerts/skip', opt)
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
         .then(json => {
             OUTPUT_showInfo("Alert Skipped!");
+        })
+        .catch(err => {
+            OUTPUT_showError(err.message);
+            console.log(err);
+        });
+}
+function PauseAlerts(is_unpause = false) {
+    let overlay = MISC_getDropdownButtonValue(document.getElementById(is_unpause ? 'ALERTS_TEST_PAUSE' : 'ALERTS_TEST_UNPAUSE'));
+    if (overlay === "") overlay = undefined;
+
+    const opt = getAuthHeader();
+    opt.method = is_unpause ? 'DELETE' : 'POST';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ overlay });
+    
+    fetch('/api/alerts/pause', opt)
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            OUTPUT_showInfo("Alerts " + (is_unpause ? 'Un' : '') + "Paused!");
+        })
+        .catch(err => {
+            OUTPUT_showError(err.message);
+            console.log(err);
+        });
+}
+
+function HistoryListRemove(clear = false) {
+    let overlay = MISC_getDropdownButtonValue(document.getElementById('ALERTS_TEST_HISTORY_REMOVE'));
+    if (overlay === "") overlay = undefined;
+
+    const opt = getAuthHeader();
+    opt.method = 'DELETE';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ overlay, mode: clear ? 'clear' : 'single' });
+
+    fetch('/api/alerts/historylist', opt)
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            OUTPUT_showInfo("Alert(s) Removed.");
         })
         .catch(err => {
             OUTPUT_showError(err.message);
@@ -3249,6 +3362,8 @@ const EVENT_TEST_DATA = {
     }
 };
 function Test_Event(event) {
+    let overlay = MISC_getDropdownButtonValue(document.getElementById('DROPDOWN_BUTTON_EVENT_' + event));
+    if (overlay === '') overlay = undefined;
     let data = null;
 
     let end = false;
@@ -3277,6 +3392,7 @@ function Test_Event(event) {
         delete data.expires_at;
     }
     data.id = 'TEST';
+    if (overlay) data.overlay = overlay;
 
     if (EVENT_CHATOUTPUT === true) data.use_chat_output = true;
 

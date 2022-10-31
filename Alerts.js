@@ -13,7 +13,7 @@ const PACKAGE_DETAILS = {
         eventsubs: ['stream.online', 'channel.follow', 'channel.subscribe', 'channel.subscription.gift', 'channel.subscription.message', 'channel.cheer', 'channel.raid', 'channel.channel_points_custom_reward_redemption.add', 'channel.channel_points_custom_reward_redemption.update', 'channel.poll.begin', 'channel.poll.update', 'channel.poll.end', 'channel.prediction.begin', 'channel.prediction.update', 'channel.prediction.lock', 'channel.prediction.end', 'channel.hype_train.begin', 'channel.hype_train.update', 'channel.hype_train.end', 'channel.goals.begin', 'channel.goals.update', 'channel.goals.end'],
         endpoints: ['GetUsers', 'GetGlobalEmotes', 'GetChannelEmotes']
     },
-    version: '0.4.0.0',
+    version: '0.4.1.0',
     server: '0.4.0.0',
     modules: {
         twitchapi: '0.4.0.0',
@@ -196,6 +196,7 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
             giftsub: 0,
             follow: 0
         };
+        this.SAVING_ERRORS = [];
 
         //API
         let APIRouter = express.Router();
@@ -586,34 +587,31 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
             return Promise.resolve();
         });
         APIRouter.put('/history', async (req, res, next) => {
-            let old = req.body['event'];
-
-            if (!old || typeof old !== 'object') {
+            let old = req.body['events'];
+            
+            if (!old) {
                 res.sendStatus(408);
                 return Promise.resolve();
             }
 
-            let updated = this.cloneJSON(old);
-            updated.seen = true;
-
             try {
-                await this.HISTORY_DATABASE.update(old, updated);
+                await this.HISTORY_DATABASE.updateMany(old, [{ seen: true }], { transform: true });
                 res.sendStatus(200);
             } catch (err) {
-                res.json({ err: '500 - Event couldnt be updated!' });
+                res.json({ err: '500 - Events couldnt be updated!' });
             }
         });
         APIRouter.delete('/history', async (req, res, next) => {
-            if (!req.body['event'] || typeof req.body['event'] !== 'object') {
+            if (!req.body['events']) {
                 res.sendStatus(408);
                 return Promise.resolve();
             }
 
             try {
-                await this.HISTORY_DATABASE.remove(req.body['event']);
+                await this.HISTORY_DATABASE.removeMany(req.body['events']);
                 res.sendStatus(200);
             } catch (err) {
-                res.json({ err: '500 - Event couldnt be removed!' });
+                res.json({ err: '500 - Events couldnt be removed!' });
             }
         });
 
@@ -659,8 +657,76 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
 
             res.sendStatus(200);
         });
+        APIRouter.post('/pause', (req, res, next) => {
+            let overlay = req.body['overlay'];
+
+            if (overlay === undefined) {
+                //Send to all Overlays
+                this.TCPMassSend('Overlay', 'pause', Date.now(), (client) => true);
+            } else {
+                //Send to single Overlay
+                this.TCPMassSend('Overlay', 'pause', Date.now(), (client) => {
+                    if (!client.misc) return false;
+                    return client.misc.split(',')[0].split(':').pop() === overlay;
+                });
+            }
+
+            res.sendStatus(200);
+        });
+        APIRouter.delete('/pause', (req, res, next) => {
+            let overlay = req.body['overlay'];
+
+            if (overlay === undefined) {
+                //Send to all Overlays
+                this.TCPMassSend('Overlay', 'unpause', Date.now(), (client) => true);
+            } else {
+                //Send to single Overlay
+                this.TCPMassSend('Overlay', 'unpause', Date.now(), (client) => {
+                    if (!client.misc) return false;
+                    return client.misc.split(',')[0].split(':').pop() === overlay;
+                });
+            }
+
+            res.sendStatus(200);
+        });
+        APIRouter.put('/counter', (req, res, next) => {
+            let overlay = req.body['overlay'];
+            let mode = req.body['mode'];
+            let amount = req.body['amount'];
+
+            if (overlay === undefined) {
+                //Send to all Overlays
+                this.TCPMassSend('Overlay', '_set_counter', mode + '-' + amount, (client) => true);
+            } else {
+                //Send to single Overlay
+                this.TCPMassSend('Overlay', '_set_counter', mode + '-' + amount, (client) => {
+                    if (!client.misc) return false;
+                    return client.misc.split(',')[0].split(':').pop() === overlay;
+                });
+            }
+
+            res.sendStatus(200);
+        });
+        APIRouter.delete('/historylist', (req, res, next) => {
+            let overlay = req.body['overlay'];
+            let mode = req.body['mode']; //single or clear
+
+            if (overlay === undefined) {
+                //Send to all Overlays
+                this.TCPMassSend('Overlay', '_remove_history_element', mode, (client) => true);
+            } else {
+                //Send to single Overlay
+                this.TCPMassSend('Overlay', '_remove_history_element', mode, (client) => {
+                    if (!client.misc) return false;
+                    return client.misc.split(',')[0].split(':').pop() === overlay;
+                });
+            }
+
+            res.sendStatus(200);
+        });
         APIRouter.put('/trigger/unseen', async (req, res, next) => {
             let mode = req.query['mode'] || 'all';
+            let overlay = req.body['overlay'];
 
             //Query
             let events = [];
@@ -677,8 +743,16 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
             
             //Modes
             if (mode === 'single') {
-                //Send
-                this.TCPMassSend('Overlay', events[0]['topic'], events[0]);
+                if (overlay === undefined) {
+                    //Send to all Overlays
+                    this.TCPMassSend('Overlay', event['topic'], event, (client) => true);
+                } else {
+                    //Send to single Overlay
+                    this.TCPMassSend('Overlay', event['topic'], event, (client) => {
+                        if (!client.misc) return false;
+                        return client.misc.split(',')[0].split(':').pop() === overlay;
+                    });
+                }
 
                 //Update DB
                 try {
@@ -689,7 +763,16 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
             } else if (mode === 'all') {
                 //Send
                 for (let event of events) {
-                    this.TCPMassSend('Overlay', event['topic'], event);
+                    if (overlay === undefined) {
+                        //Send to all Overlays
+                        this.TCPMassSend('Overlay', event['topic'], event, (client) => true);
+                    } else {
+                        //Send to single Overlay
+                        this.TCPMassSend('Overlay', event['topic'], event, (client) => {
+                            if (!client.misc) return false;
+                            return client.misc.split(',')[0].split(':').pop() === overlay;
+                        });
+                    }
                 }
 
                 //Update DB
@@ -702,10 +785,39 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
 
             res.sendStatus(200);
         });
+        APIRouter.put('/trigger/collection', async (req, res, next) => {
+            let events = req.body['events'];
+            let overlay = req.body['overlay'];
+
+            //Send
+            for (let event of events) {
+                if (overlay === undefined) {
+                    //Send to all Overlays
+                    this.TCPMassSend('Overlay', event['topic'], event, (client) => true);
+                } else {
+                    //Send to single Overlay
+                    this.TCPMassSend('Overlay', event['topic'], event, (client) => {
+                        if (!client.misc) return false;
+                        return client.misc.split(',')[0].split(':').pop() === overlay;
+                    });
+                }
+            }
+
+            //Update DB
+            try {
+                await this.HISTORY_DATABASE.updateMany(events, [{ seen: true }], { transform: true });
+            } catch (err) {
+                return res.json({ err: '500 - History Database update failed.' });
+            }
+
+            res.sendStatus(200);
+        });
         APIRouter.post('/trigger/:alert', async (req, res, next) => {
             if (!SUPPORTED_ALERTS.find(elt => elt === req.params['alert']) && !SUPPORTED_EVENTS.find(elt => elt === req.params['alert'])) return res.sendStatus(400);
 
             if (!req.body) req.body = {};
+            let overlay = req.body['overlay'];
+            delete req.body['overlay'];
             req.body.is_test = true;
             req.body.seen = this.TCP_Clients > 0;
 
@@ -774,7 +886,16 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
             }
 
             //Trigger Alert
-            this.TCPMassSend('Overlay', req.params['alert'], req.body);
+            if (overlay === undefined) {
+                //Send to all Overlays
+                this.TCPMassSend('Overlay', req.params['alert'], req.body, (client) => true);
+            } else {
+                //Send to single Overlay
+                this.TCPMassSend('Overlay', req.params['alert'], req.body, (client) => {
+                    if (!client.misc) return false;
+                    return client.misc.split(',')[0].split(':').pop() === overlay;
+                });
+            }
 
             //Add to History
             if (req.body.add_history === true) {
@@ -845,7 +966,9 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
 
         //Displayables
         this.addDisplayables([
-            { name: 'TCP Clients', value: () => this.TCP_Clients.length }
+            { name: 'TCP History Clients', value: () => this.TCP_Clients.filter(elt => elt.origin === 'History').length },
+            { name: 'TCP Overlay Clients', value: () => this.TCP_Clients.filter(elt => elt.origin === 'Overlay').length },
+            { name: '[DEV] History Saving Errors', value: () => this.SAVING_ERRORS.length }
         ]);
 
         this.SETUP_COMPLETE = true;
@@ -1767,7 +1890,10 @@ class Alerts extends require('./../../Util/PackageBase.js').PackageBase {
         };
 
         //Add to History
-        this.HISTORY_DATABASE.insert(event_data).catch(err => this.Logger.error("Follow Event couldnt be saved to History!"));
+        this.HISTORY_DATABASE.insert(event_data).catch(err => {
+            this.SAVING_ERRORS.push(event_data);
+            this.Logger.error("Follow Event couldnt be saved to History!");
+        });
         
         //Send to WebHooks
         this.TCPMassSend(["Overlay", "History"], "follow", event_data);

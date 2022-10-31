@@ -13,6 +13,8 @@ let HISTORY_NEXT_PAGINATION = "";
 let EVENTS = [];
 let EVENTS_NEXT_PAGINATION = "";
 
+let PAUSE_HISTORY_REFRESH = false;
+
 const ALERT_TEXTS = {
     'follow': '{username} just followed!',
     'sub': '{username} just subscribed with {tier}!',
@@ -28,6 +30,12 @@ const ALERT_TEXTS = {
 async function init() {
     OUTPUT_create();
     setupWebSocket();
+
+
+    await fetchOverlays().catch(err => {
+        OUTPUT_showError(err.message);
+        console.log(err);
+    });
 
     await fetchHistory().catch(err => {
         OUTPUT_showError(err.message);
@@ -45,7 +53,9 @@ async function init() {
     document.getElementById('INIT_LOADER').remove();
     OUTPUT_create();
 
-    setInterval(() => showHistory(HISTORY),  60 * 1000);
+    setInterval(() => {
+        if (!PAUSE_HISTORY_REFRESH) showHistory(HISTORY)
+    }, 60 * 1000);
 }
 function setupWebSocket() {
     socket = StartWebsocket(register_info, TCPMessageHandler, terminated_event);
@@ -72,8 +82,6 @@ function Add2History(data) {
     showHistory(HISTORY);
 }
 function showHistory(history = []) {
-    document.getElementById('HISTORY_SEEN_BTN').disabled = true;
-
     //Sort just in case
     history.sort((a, b) => b.time - a.time);
 
@@ -91,10 +99,27 @@ function showHistory(history = []) {
     if (document.getElementById('HISTORY').innerHTML === "") {
         document.getElementById('HISTORY').innerHTML = '<center>NO ALERTS</center>';
     }
+
+    if (HISTORY.find(elt => elt.seen !== true)) {
+        document.getElementById('HISTORY_MARK_BTN').style.display = 'inline-block';
+        document.getElementById('HISTORY_SEEN_BTN').style.display = 'inline-block';
+    } else {
+        document.getElementById('HISTORY_MARK_BTN').style.display = 'none';
+
+        let events = [];
+
+        for (let elt of document.getElementsByClassName('HISTORY_EVENT_UI_MULTISELECT')) {
+            if (elt.checked) {
+                events.push(parseInt(elt.dataset.index));
+            }
+        }
+
+        if (events.length === 0) {
+            document.getElementById('HISTORY_SEEN_BTN').style.display = 'none';
+        }
+    }
 }
 function createEvent(event, i) {
-    if (event.seen === false) document.getElementById('HISTORY_SEEN_BTN').disabled = false;
-
     let s = '';
     s += '<div  class="HISTORY_EVENT" ' + (event.seen !== false ? 'seen' : '') + '>';
     s += '<div class="HISTORY_EVENT_TIME">' + RelativeTime(Math.min(Date.now() - 1000, event.time), 'relative') + '</div>';
@@ -107,7 +132,12 @@ function createEvent(event, i) {
     s += '</div>';
     s += '<div class="HISTORY_EVENT_UI">';
     s += '<img src="/images/icons/refresh.svg" title="Re-Trigger Alert" onclick="retriggertEvent(' + i + ', event)" />';
+
+    s += '<div class="HISTORY_EVENT_UI_REMOVE_WRAPPER">';
     s += '<img src="/images/icons/trash-alt-solid.svg" red title="Remove History Entry" onclick="removeEvent(' + i + ', this, event)" />';
+    s += '<input class="HISTORY_EVENT_UI_MULTISELECT" type="checkbox" data-index="' + i + '" onclick="History_multiselect(' + i + ', this, event)" />';
+    s += '</div>';
+
     s += '</div>';
     s += '</div>';
     return s;
@@ -136,6 +166,23 @@ async function fetchHistory(pagination = GetPaginationString(30, 0, { timesorted
             return Promise.reject(err);
         });
 }
+async function fetchOverlays() {
+    return fetch('/api/alerts/overlays', getAuthHeader())
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            let options = [{ name: '', title: 'All Overlays' }];
+
+            for (let overlay of json.overlays) {
+                options.push({ name: overlay.token, title: overlay.name });
+            }
+            
+            document.getElementById('HISTOR_HEADER_UI').innerHTML = MISC_createDropdownButton('TRIGGER UNSEEN', options, 0, 'triggerEvents', '', 'HISTORY_SEEN_BTN') + document.getElementById('HISTOR_HEADER_UI').innerHTML;
+        })
+        .catch(err => {
+            return Promise.reject(err);
+        });
+}
+
 function retriggertEvent(i, e) {
     e.stopPropagation();
     if (i === undefined) return;
@@ -186,7 +233,7 @@ async function removeEvent(i, elt) {
     const opt = getAuthHeader();
     opt.method = 'DELETE';
     opt.headers['Content-Type'] = 'application/json';
-    opt.body = JSON.stringify({ event });
+    opt.body = JSON.stringify({ events: [event] });
 
     fetch('/api/alerts/history', opt)
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
@@ -198,6 +245,7 @@ async function removeEvent(i, elt) {
         .catch(err => {
             OUTPUT_showError(err.message);
             console.log(err);
+            showHistory(HISTORY);
         });
 }
 async function updateEvent(i, elt) {
@@ -210,7 +258,7 @@ async function updateEvent(i, elt) {
     const opt = getAuthHeader();
     opt.method = 'PUT';
     opt.headers['Content-Type'] = 'application/json';
-    opt.body = JSON.stringify({ event });
+    opt.body = JSON.stringify({ events: [event] });
 
     fetch('/api/alerts/history', opt)
         .then(STANDARD_FETCH_RESPONSE_CHECKER)
@@ -221,8 +269,186 @@ async function updateEvent(i, elt) {
         .catch(err => {
             OUTPUT_showError(err.message);
             console.log(err);
+            showHistory(HISTORY);
         });
 }
+
+function History_multiselect(i, elt) {
+    if (elt.checked) elt.style.display = 'inline-block';
+    else elt.style.display = '';
+
+    let events = [];
+
+    for (let elt of document.getElementsByClassName('HISTORY_EVENT_UI_MULTISELECT')) {
+        if (elt.checked) {
+            events.push(parseInt(elt.dataset.index));
+        }
+    }
+
+    if (events.length === 0) {
+        PAUSE_HISTORY_REFRESH = false;
+        document.getElementById('HISTORY_REMOVE_SELECT_BTN').style.display = 'none';
+        document.getElementById('HISTORY_MARK_BTN').innerHTML = 'MARK ALL AS SEEN';
+        document.getElementById('HISTORY_SEEN_BTN').childNodes[0].childNodes[0].innerHTML = 'TRIGGER UNSEEN';
+        if (!HISTORY.find(elt => elt.seen !== true)) document.getElementById('HISTORY_SEEN_BTN').style.display = 'none';
+    }
+    else {
+        PAUSE_HISTORY_REFRESH = true;
+        document.getElementById('HISTORY_REMOVE_SELECT_BTN').style.display = 'inline-block';
+        document.getElementById('HISTORY_MARK_BTN').innerHTML = 'MARK SELECTED AS SEEN';
+        document.getElementById('HISTORY_SEEN_BTN').style.display = 'inline-block';
+        document.getElementById('HISTORY_SEEN_BTN').childNodes[0].childNodes[0].innerHTML = 'TRIGGER SELECTED';
+    }
+}
+async function triggerEvents() {
+    let overlay = MISC_getDropdownButtonValue(document.getElementById('HISTORY_SEEN_BTN'));
+    if (overlay === "") overlay = undefined;
+    OUTPUT_hideError();
+    
+    const opt = getAuthHeader();
+    opt.method = 'PUT';
+    opt.headers['Content-Type'] = 'application/json';
+
+    let events = [];
+    let events_data = [];
+
+    for (let elt of document.getElementsByClassName('HISTORY_EVENT_UI_MULTISELECT')) {
+        if (elt.checked) {
+            events.push(parseInt(elt.dataset.index));
+            events_data.push(HISTORY[parseInt(elt.dataset.index)]);
+        }
+    }
+
+    if (events.length === 0) {
+        opt.body = JSON.stringify({ overlay, event });
+
+        fetch('/api/alerts/trigger/unseen?mode=all', opt)
+            .then(STANDARD_FETCH_RESPONSE_CHECKER)
+            .then(json => {
+                for (let event of HISTORY) {
+                    event.seen = true;
+                }
+
+                showHistory(HISTORY);
+            })
+            .catch(err => {
+                OUTPUT_showError(err.message);
+                console.log(err);
+                showHistory(HISTORY);
+            });
+    } else {
+        opt.body = JSON.stringify({ overlay, events: events_data.reverse() });
+
+        fetch('/api/alerts/trigger/collection', opt)
+            .then(STANDARD_FETCH_RESPONSE_CHECKER)
+            .then(json => {
+                for (let event of events) {
+                    HISTORY[event].seen = true;
+                }
+
+                showHistory(HISTORY);
+            })
+            .catch(err => {
+                OUTPUT_showError(err.message);
+                console.log(err);
+                showHistory(HISTORY);
+            });
+    }
+
+    document.getElementById('HISTORY').innerHTML = '<div class="WAITING_RING">' + MISC_LOADING_RING_CREATE() + '</div>';
+}
+async function updateEvents() {
+    let events = [];
+    let events_data = [];
+
+    for (let elt of document.getElementsByClassName('HISTORY_EVENT_UI_MULTISELECT')) {
+        if (elt.checked) {
+            events.push(parseInt(elt.dataset.index));
+            events_data.push(HISTORY[parseInt(elt.dataset.index)]);
+        }
+    }
+
+    if (events.length === 0) {
+        events_data = HISTORY.filter((ele, i) => {
+            if (ele.seen === false) {
+                events.push(i);
+                return true;
+            }
+            return false;
+        });
+    };
+    if (events.length === 0) return;
+    OUTPUT_hideError();
+
+    const opt = getAuthHeader();
+    opt.method = 'PUT';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ events: events_data });
+
+    fetch('/api/alerts/history', opt)
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            //Update History seen values
+            for (let event of events) {
+                HISTORY[event].seen = true;
+            }
+
+            showHistory(HISTORY);
+        })
+        .catch(err => {
+            OUTPUT_showError(err.message);
+            console.log(err);
+            showHistory(HISTORY);
+        });
+}
+async function removeEvents() {
+    let events = [];
+    let events_data = [];
+
+    for (let elt of document.getElementsByClassName('HISTORY_EVENT_UI_MULTISELECT')) {
+        if (elt.checked) {
+            events.push(parseInt(elt.dataset.index));
+            events_data.push(HISTORY[parseInt(elt.dataset.index)]);
+        }
+    }
+
+    if (events.length === 0) return;
+
+    //Await Confirmation
+    let answer = 'NO';
+
+    try {
+        answer = await MISC_USERCONFIRM("YOU SURE YOU WANT THIS?", "Do you really want to delete these History Events?");
+    } catch (err) {
+
+    }
+
+    if (answer !== 'YES') return Promise.resolve();
+    
+    OUTPUT_hideError();
+
+    const opt = getAuthHeader();
+    opt.method = 'DELETE';
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify({ events: events_data });
+
+    fetch('/api/alerts/history', opt)
+        .then(STANDARD_FETCH_RESPONSE_CHECKER)
+        .then(json => {
+            //Update History
+            for (let event of events.reverse()) {
+                HISTORY.splice(event, 1);
+            }
+
+            showHistory(HISTORY);
+        })
+        .catch(err => {
+            OUTPUT_showError(err.message);
+            console.log(err);
+            showHistory(HISTORY);
+        });
+}
+
 function loadMoreHistory() {
     document.getElementById('History_load_more').disabled = true;
     OUTPUT_hideError();
@@ -247,33 +473,6 @@ function loadMoreHistory() {
             OUTPUT_showError(err.message);
             console.log(err);
             document.getElementById('History_load_more').disabled = false;
-        });
-}
-
-async function MassTriggerUnseen(elt) {
-    OUTPUT_hideError();
-
-    const opt = getAuthHeader();
-    opt.method = 'PUT';
-    opt.headers['Content-Type'] = 'application/json';
-    opt.body = JSON.stringify({ event });
-
-    document.getElementById('HISTORY').innerHTML = '<div class="WAITING_RING">' + MISC_LOADING_RING_CREATE() + '</div>';
-    elt.disabled = true;
-
-    fetch('/api/alerts/trigger/unseen?mode=all', opt)
-        .then(STANDARD_FETCH_RESPONSE_CHECKER)
-        .then(json => {
-            for (let event of HISTORY) {
-                event.seen = true;
-            }
-
-            showHistory(HISTORY);
-        })
-        .catch(err => {
-            OUTPUT_showError(err.message);
-            console.log(err);
-            elt.disabled = false;
         });
 }
 

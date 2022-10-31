@@ -1966,7 +1966,7 @@ function Counter_createCounter(id = '', topic = "", amount = 0, cfg = {}) {
 
     //Create HTML
     let s = '';
-    s += '<div class="COUNTER_TOPIC" id="' + id + '" data-name="' + topic + '">';
+    s += '<div class="COUNTER_TOPIC" id="' + id + '" data-name="' + topic + '" data-amount="' + amount +'">';
     for (let elt of elements) {
         if (elt.disabled === true) continue;
 

@@ -3,7 +3,7 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="utf-8" />
-    <title>Alerts - FrikyBot</title>
+    <title>Alerts Overlay - FrikyBot</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- GENERAL CSS -->
@@ -45,6 +45,11 @@
                     color: red;
                     text-shadow: -1px -1px 0 white, 1px -1px 0 white, -1px 1px 0 white, 1px 1px 0 white;
                 }
+
+                #PRELOAD {
+                    position: absolute;
+                    right: -1000000vw;
+                }
     </style>
 
     <!-- GENERAL JS-->
@@ -61,12 +66,15 @@
         let RECONNECT_TIMEOUT = 1;
         let AUTO_RECONNECT = true;
 
+        let PAUSED = false;
         let CONFIG = {};
         let OVERLAY = null;
         let PROFILES = null;
         let EVENT_PIPELINE = [];
         let BOMBS = [];
 
+        const PRELOAD_LENGTH = 10 * 1000;
+        let PRELOAD_TIMEOUT = null;
         let cur_counter = 0;
 
         function init(reconnect = false) {
@@ -99,10 +107,16 @@
                             document.getElementsByTagName('body')[0].innerHTML = '<div id="INVALID"><center>!! THIS OVERLAY IS OUTDATED !!</center><center>!! PLEASE UPDATE OVERLAY URL !!</center></div>';
                             return;
                         }
-                        if (!document.getElementById('ALERT')) document.getElementsByTagName('body')[0].innerHTML = '<div id="ALERT"></div>';
+                        if (!document.getElementById('ALERT')) {
+                            let s = '';
+                            s += '<div id="ALERT"></div>';
+                            s += '<div id="PRELOAD"></div>';
+                            document.getElementsByTagName('body')[0].innerHTML = s;
+                        }
 
                         OVERLAY = data;
                         document.getElementsByTagName('BODY')[0].style.setProperty('--chroma-key', OVERLAY.chroma_key || '#ff00ff');
+                        document.title = OVERLAY.name + " - Alerts Overlay - FrikyBot";
 
                         if (OVERLAY && OVERLAY.type === 'latest' && OVERLAY.settings.general.show_init_icon === true) {
                             List_triggerLatest('init', null);
@@ -111,10 +125,53 @@
                         break;
                     case 'profiles': {
                         PROFILES = data;
+
+                        //Preload
+                        if (PRELOAD_TIMEOUT) clearTimeout(PRELOAD_TIMEOUT);
+
+                        let s = '';
+
+                        for (let profile of PROFILES) {
+                            if (profile.image === "") continue;
+                            let extension = profile.image.split('.').pop();
+
+                            if (SUPPORTED_VIDEO_FILES.find(elt => elt === extension)) {
+                                s += '<video muted loop autoplay>';
+                                s += '<source src="/Alerts/custom/' + profile.image + '" type="video/' + extension + '">';
+                                s += '</video>';
+                            }
+                            else s += '<img src="/Alerts/custom/' + profile.image + '" />';
+                        }
+
+                        document.getElementById('PRELOAD').innerHTML += s;
+
+
+                        PRELOAD_TIMEOUT = setTimeout(() => {
+                            document.getElementById('PRELOAD').innerHTML = '';
+                        }, PRELOAD_LENGTH);
                     }
                         break;
                     case '+profiles': {
                         PROFILES.push(data);
+
+                        if (data.image !== "") {
+                            if (PRELOAD_TIMEOUT) clearTimeout(PRELOAD_TIMEOUT);
+                            let s = '';
+
+                            let extension = data.image.split('.').pop();
+
+                            if (SUPPORTED_VIDEO_FILES.find(elt => elt === extension)) {
+                                s += '<video muted loop autoplay>';
+                                s += '<source src="/Alerts/custom/' + data.image + '" type="video/' + extension + '">';
+                                s += '</video>';
+                            }
+                            else s += '<img src="/Alerts/custom/' + data.image + '" />';
+                            document.getElementById('PRELOAD').innerHTML += s;
+
+                            PRELOAD_TIMEOUT = setTimeout(() => {
+                                document.getElementById('PRELOAD').innerHTML = '';
+                            }, PRELOAD_LENGTH);
+                        }
                     }
                         break;
                     case '-profiles': {
@@ -127,6 +184,25 @@
                             return false;
                         });
                         if (idx >= 0) PROFILES.splice(idx, 1);
+
+                        if (data.image !== "") {
+                            if (PRELOAD_TIMEOUT) clearTimeout(PRELOAD_TIMEOUT);
+                            let s = '';
+
+                            let extension = data.image.split('.').pop();
+
+                            if (SUPPORTED_VIDEO_FILES.find(elt => elt === extension)) {
+                                s += '<video muted loop autoplay>';
+                                s += '<source src="/Alerts/custom/' + data.image + '" type="video/' + extension + '">';
+                                s += '</video>';
+                            }
+                            else s += '<img src="/Alerts/custom/' + data.image + '" />';
+                            document.getElementById('PRELOAD').innerHTML += s;
+
+                            PRELOAD_TIMEOUT = setTimeout(() => {
+                                document.getElementById('PRELOAD').innerHTML = '';
+                            }, PRELOAD_LENGTH);
+                        }
                     }
                         break;
                     case '~profiles': {
@@ -140,14 +216,85 @@
                         });
                         if (idx >= 0) PROFILES.splice(idx, 1);
                         PROFILES.push(data);
+
+                        if (data.image !== "") {
+                            if (PRELOAD_TIMEOUT) clearTimeout(PRELOAD_TIMEOUT);
+                            let s = '';
+
+                            let extension = data.image.split('.').pop();
+
+                            if (SUPPORTED_VIDEO_FILES.find(elt => elt === extension)) {
+                                s += '<video muted loop autoplay>';
+                                s += '<source src="/Alerts/custom/' + data.image + '" type="video/' + extension + '">';
+                                s += '</video>';
+                            }
+                            else s += '<img src="/Alerts/custom/' + data.image + '" />';
+                            document.getElementById('PRELOAD').innerHTML += s;
+
+                            PRELOAD_TIMEOUT = setTimeout(() => {
+                                document.getElementById('PRELOAD').innerHTML = '';
+                            }, PRELOAD_LENGTH);
+                        }
                     }
                         break;
-                    case 'skip':
-                        {
-                            SKIPPED = true;
-                            WEIRD_TWITCH_TIME_DIALATION = 0;
-                            if (OVERLAY && OVERLAY.type === 'events') document.getElementById("ALERT").innerHTML = "";
+                    case 'clear': {
+                        EVENT_PIPELINE = [];
+                    }
+                    case 'skip': {
+                        SKIPPED = true;
+                        WEIRD_TWITCH_TIME_DIALATION = 0;
+                        if (OVERLAY && OVERLAY.type === 'events') document.getElementById("ALERT").innerHTML = "";
+                    }
+                        break;
+                    case 'pause': {
+                        PAUSED = true;
+                    }
+                        break;
+                    case 'unpause': {
+                        PAUSED = false;
+                        if (EVENT_PIPELINE.length > 1) nextEvent();
+                    }
+                        break;
+                    case '_set_counter': {
+                        let mode = data.substring(0, 1);
+                        let amount = parseInt(data.substring(2));
+
+                        if (OVERLAY.type === 'counter' && document.getElementById("MASTER_EVENT")) {
+                            let topic = Object.getOwnPropertyNames(OVERLAY.settings)[0];
+                            let updated_counter = 0;
+
+                            updated_counter = parseInt(document.getElementById("MASTER_EVENT").dataset.amount);
+
+                            switch (mode) {
+                                case '=': {
+                                    updated_counter = amount;
+                                }
+                                    break;
+                                case '+': {
+                                    updated_counter += amount;
+                                }
+                                    break;
+                                case '-': {
+                                    updated_counter -= amount;
+                                }
+                                    break;
+                            }
+
+                            document.getElementById("ALERT").innerHTML = Counter_createCounter('MASTER_EVENT', topic, updated_counter, OVERLAY.settings[topic]);
+                            Counter_adjustGrid(document.getElementById("MASTER_EVENT"));
                         }
+                    }
+                        break;
+                    case '_remove_history_element': {
+                        let mode = data;
+                        
+                        if (OVERLAY.type === 'history' && document.getElementById('MASTER_EVENT')) {
+                            do {
+                                let first = FindSubElementFromPath(document.getElementById('MASTER_EVENT'), ['.HISTORY_LIST_ELEMENT']);
+                                if (first) first.remove();
+                            } while (mode === 'clear' && document.getElementById('MASTER_EVENT').childNodes.length > 1);
+                        }
+                    }
                         break;
                     default: {
                         //Add to Pipeline
@@ -164,7 +311,7 @@
         }
         function nextEvent() {
             SKIPPED = false;
-            if (EVENT_PIPELINE.length === 0) return;
+            if (EVENT_PIPELINE.length === 0 || PAUSED) return;
 
             let event = EVENT_PIPELINE[0];
             

@@ -79,7 +79,13 @@
                     <a href="/Alerts/Settings" id="SETTINGS_LINK">GO TO SETTINGS</a>
                 </div>
 
-                <center class="cat">HISTORY <button id="HISTORY_SEEN_BTN" onclick="MassTriggerUnseen(this);" disabled>TRIGGER UNSEEN</button></center>
+                <center class="cat">
+                    HISTORY
+                    <div id="HISTOR_HEADER_UI">
+                        <button id="HISTORY_MARK_BTN" onclick="updateEvents();">MARK ALL AS SEEN</button>
+                        <button id="HISTORY_REMOVE_SELECT_BTN" onclick="removeEvents();">REMOVE SELECTED</button>
+                    </div>
+                </center>
                 <div id="HISTORY">
 
                 </div>

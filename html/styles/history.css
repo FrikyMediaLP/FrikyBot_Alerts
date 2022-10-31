@@ -1,4 +1,4 @@
-#content {
+﻿#content {
     background-color: #f5f5f5 !important;
 }
 .darkmode #grid #content {
@@ -7,7 +7,7 @@
 }
 
 #content > output {
-    margin-top: 10px;
+    margin: 10px 0;
 }
 
 #content > #INIT_LOADER {
@@ -64,23 +64,47 @@
     border-bottom: 1px solid dimgray;
     position: relative;
 }
-    #content #ALERTS > center.cat > button {
-        position: absolute;
-        bottom: 2px;
-        right: 0;
+
+/* HISTORY HEADER UI */
+#HISTOR_HEADER_UI {
+    position: absolute;
+    bottom: 2px;
+    right: 0;
+}
+
+    #HISTOR_HEADER_UI > button {
         cursor: pointer;
+        background-color: var(--frikybot-light);
+        color: white;
         border: none;
         padding: 5px 20px;
         outline: none;
+        font-size: 15px;
+        height: 28px;
+        font-family: 'Roboto';
+        font-weight: 400;
     }
-        #content #ALERTS > center.cat > button[disabled] {
+
+        #HISTOR_HEADER_UI > button[disabled] {
             cursor: default;
         }
 
-        #content #ALERTS > center.cat > button:not([disabled]):hover {
-            background-color: var(--frikybot-light);
+        #HISTOR_HEADER_UI > button:not([disabled]):hover {
+            background-color: var(--frikybot-dark);
             color: white;
         }
+
+
+#HISTORY_SEEN_BTN {
+    --header-font-size: 15px;
+    --content-font-size: 15px;
+}
+
+#HISTORY_SEEN_BTN,
+#HISTORY_MARK_BTN,
+#HISTORY_REMOVE_SELECT_BTN {
+    display: none;
+}
 
 #HISTORY {
     width: 100%;
@@ -95,7 +119,7 @@
 
     #HISTORY .HISTORY_EVENT {
         display: grid;
-        grid-template-columns: 130px 150px auto 50px;
+        grid-template-columns: 130px 150px auto 85px;
         grid-template-rows: auto;
         cursor: default;
     }
@@ -125,10 +149,19 @@
         #HISTORY .HISTORY_EVENT:not([seen]) .HISTORY_EVENT_TEXT {
             cursor: pointer;
         }
+
+        #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI_REMOVE_WRAPPER {
+            width: 60px;
+            display: inline-block;
+        }
+
         #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img {
             width: 17px;
             filter: invert(0.5);
             cursor: pointer;
+            display: inline-block;
+            margin-right: 5px;
+            transform: translate(0, 2px);
         }
             #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img:hover {
                 filter: invert(0.2);
@@ -139,6 +172,14 @@
             #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI img:not(:first-child) {
                 margin-left: 10px;
             }
+
+        #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI_REMOVE_WRAPPER > input {
+            display: none;
+            cursor: pointer;
+        }
+        #HISTORY .HISTORY_EVENT .HISTORY_EVENT_UI_REMOVE_WRAPPER:hover > input {
+            display: inline-block;
+        }
 
 .HISTORY_EVENT_MESSAGE {
     color: gray;
